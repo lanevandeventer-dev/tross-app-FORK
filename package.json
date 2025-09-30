@@ -1,0 +1,32 @@
+{
+  "name": "trossapp",
+  "version": "1.0.0",
+  "description": "TrossApp - Skills-based work order management system monorepo",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev:backend": "npm run dev --workspace=backend",
+    "dev:frontend": "cd frontend && flutter run -d chrome",
+    "build:all": "npm run build --workspace=backend && cd frontend && flutter build web",
+    "test:e2e": "playwright test",
+    "test:load": "npx artillery run load-test.yml",
+    "test:all": "npm run test --workspace=backend && cd frontend && flutter test"
+  },
+  "keywords": [],
+  "author": "TrossApp Team",
+  "license": "MIT",
+  "type": "commonjs",
+  "private": "true",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "devDependencies": {
+    "@playwright/test": "^1.55.1",
+    "concurrently": "^9.2.1",
+    "eslint": "^9.36.0",
+    "prettier": "^3.6.2"
+  }
+}
