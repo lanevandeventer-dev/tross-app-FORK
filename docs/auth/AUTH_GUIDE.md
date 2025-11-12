@@ -1,7 +1,6 @@
 # 🔐 TrossApp Authentication & Authorization Guide
 
-**Last Updated:** October 17, 2025  
-**Status:** ✅ Production-Ready Dual Auth System
+**Complete guide to TrossApp's dual authentication system and role-based access control**
 
 ---
 
@@ -675,10 +674,8 @@ npm run health
 - [RFC 7519 - JWT Standard](https://datatracker.ietf.org/doc/html/rfc7519)
 - [OAuth 2.0 PKCE](https://oauth.net/2/pkce/)
 - [JWT Best Practices](https://datatracker.ietf.org/doc/html/rfc8725)
-- [TrossApp Auth0 Setup Guide](../AUTH0_SETUP.md)
+- [TrossApp Auth0 Setup Guide](AUTH0_SETUP.md)
 
 ---
 
-**Last Updated:** October 17, 2025  
-**Maintainer:** TrossApp Team  
-**Version:** 2.0 (Consolidated from 5 docs)
+**TrossApp Authentication Guide**

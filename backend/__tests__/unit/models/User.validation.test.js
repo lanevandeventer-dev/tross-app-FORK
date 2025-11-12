@@ -10,9 +10,11 @@
  * - User.relationships.test.js - Role relationships and foreign keys
  */
 
-// Mock database BEFORE requiring User model
-jest.mock("../../../db/connection");
+// Setup centralized mocks FIRST
+const { setupModuleMocks } = require("../../setup/test-setup");
+setupModuleMocks();
 
+// NOW import modules
 const User = require("../../../db/models/User");
 const db = require("../../../db/connection");
 
@@ -76,15 +78,15 @@ describe("User Model - Validation", () => {
   });
 
   // ===========================
-  // getAll() validation
+  // findAll() validation
   // ===========================
-  describe("getAll() - Error Handling", () => {
+  describe("findAll() - Error Handling", () => {
     it("should handle database errors gracefully", async () => {
       // Arrange
-      db.query.mockRejectedValue(new Error("Database connection failed"));
+      db.query.mockRejectedValue(new Error("Connection lost"));
 
       // Act & Assert
-      await expect(User.getAll()).rejects.toThrow("Failed to retrieve users");
+      await expect(User.findAll()).rejects.toThrow("Failed to retrieve users");
     });
   });
 
@@ -328,7 +330,7 @@ describe("User Model - Validation", () => {
       expect(db.query).not.toHaveBeenCalled();
     });
 
-    it("should throw error when user not found (soft delete)", async () => {
+    it("should throw error when user not found", async () => {
       // Arrange
       db.query.mockResolvedValue({ rows: [] });
 
@@ -336,28 +338,12 @@ describe("User Model - Validation", () => {
       await expect(User.delete(999)).rejects.toThrow("User not found");
     });
 
-    it("should throw error when user not found (hard delete)", async () => {
-      // Arrange
-      db.query.mockResolvedValue({ rows: [] });
-
-      // Act & Assert
-      await expect(User.delete(999, true)).rejects.toThrow("User not found");
-    });
-
-    it("should handle database errors during soft delete", async () => {
+    it("should handle database errors during deletion", async () => {
       // Arrange
       db.query.mockRejectedValue(new Error("Database error"));
 
       // Act & Assert
       await expect(User.delete(1)).rejects.toThrow("Database error");
-    });
-
-    it("should handle database errors during hard delete", async () => {
-      // Arrange
-      db.query.mockRejectedValue(new Error("Database error"));
-
-      // Act & Assert
-      await expect(User.delete(1, true)).rejects.toThrow("Database error");
     });
   });
 });

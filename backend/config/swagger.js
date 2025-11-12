@@ -5,22 +5,19 @@
  * As business logic grows, this will be expanded with new endpoints.
  */
 
-const swaggerJsdoc = require("swagger-jsdoc");
+const swaggerJsdoc = require('swagger-jsdoc');
 
 const options = {
   definition: {
-    openapi: "3.0.0",
+    openapi: '3.0.0',
     info: {
-      title: "TrossApp API",
-      version: "1.0.0",
+      title: 'TrossApp API',
+      version: '1.0.0',
       description: `
         TrossApp Backend REST API - Skills-based work order management system.
         
-        **Current Status:** MVP Foundation API
-        
-        This documentation covers the foundational authentication, user management, 
-        and role-based access control endpoints. Business logic endpoints will be 
-        added as features are developed.
+        This documentation covers foundational authentication, user management, 
+        and role-based access control endpoints.
         
         ## Authentication
         
@@ -32,7 +29,7 @@ const options = {
         ## Dual Authentication Strategy
         
         - **Development Mode:** JWT-based authentication with test users
-        - **Production Mode:** Auth0 OAuth2/OIDC (currently stubs, full implementation planned)
+        - **Production Mode:** Auth0 OAuth2/OIDC integration
         
         ## Response Format
         
@@ -41,232 +38,272 @@ const options = {
         {
           "success": true,
           "data": {...},
-          "timestamp": "2025-10-16T12:00:00.000Z"
+          "timestamp": "2025-11-12T12:00:00.000Z"
         }
         \`\`\`
         
         Error responses:
         \`\`\`json
         {
-          "error": "Error Type",
-          "message": "Detailed error message",
-          "timestamp": "2025-10-16T12:00:00.000Z"
+          "success": false,
+          "error": "Error message describing what went wrong",
+          "timestamp": "2025-11-12T12:00:00.000Z"
         }
         \`\`\`
       `,
       contact: {
-        name: "TrossApp Team",
-        email: "dev@trossapp.com",
+        name: 'TrossApp Team',
+        email: 'dev@trossapp.com',
       },
       license: {
-        name: "MIT",
-        url: "https://opensource.org/licenses/MIT",
+        name: 'MIT',
+        url: 'https://opensource.org/licenses/MIT',
       },
     },
     servers: [
       {
-        url: "http://localhost:3001",
-        description: "Development server",
+        url: 'http://localhost:3001',
+        description: 'Development server',
       },
       {
-        url: "https://api.trossapp.com",
-        description: "Production server (future)",
+        url: 'https://api.trossapp.com',
+        description: 'Production server (future)',
       },
     ],
     components: {
       securitySchemes: {
         bearerAuth: {
-          type: "http",
-          scheme: "bearer",
-          bearerFormat: "JWT",
-          description: "JWT token from /api/dev/token (dev) or Auth0 (prod)",
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+          description: 'JWT token from /api/dev/token (dev) or Auth0 (prod)',
         },
       },
       schemas: {
         Error: {
-          type: "object",
+          type: 'object',
           properties: {
-            error: {
-              type: "string",
-              description: "Error type",
-              example: "Bad Request",
+            success: {
+              type: 'boolean',
+              description: 'Always false for error responses',
+              example: false,
             },
-            message: {
-              type: "string",
-              description: "Detailed error message",
-              example: "Email is required",
+            error: {
+              type: 'string',
+              description: 'Error message describing what went wrong',
+              example: 'Role not found',
             },
             timestamp: {
-              type: "string",
-              format: "date-time",
-              description: "ISO 8601 timestamp",
-              example: "2025-10-16T12:00:00.000Z",
+              type: 'string',
+              format: 'date-time',
+              description: 'ISO 8601 timestamp',
+              example: '2025-11-12T12:00:00.000Z',
             },
           },
+          required: ['success', 'error', 'timestamp'],
         },
         User: {
-          type: "object",
+          type: 'object',
           properties: {
             id: {
-              type: "integer",
-              description: "User ID",
+              type: 'integer',
+              description: 'User ID',
               example: 1,
             },
             auth0_id: {
-              type: "string",
-              description: "Auth0 subject ID",
-              example: "auth0|507f1f77bcf86cd799439011",
+              type: 'string',
+              nullable: true,
+              description: 'Auth0 subject ID (null for pending_activation users)',
+              example: 'auth0|507f1f77bcf86cd799439011',
             },
             email: {
-              type: "string",
-              format: "email",
-              description: "User email address",
-              example: "user@example.com",
+              type: 'string',
+              format: 'email',
+              description: 'User email address',
+              example: 'user@example.com',
             },
             first_name: {
-              type: "string",
+              type: 'string',
               nullable: true,
-              description: "First name",
-              example: "John",
+              description: 'First name',
+              example: 'John',
             },
             last_name: {
-              type: "string",
+              type: 'string',
               nullable: true,
-              description: "Last name",
-              example: "Doe",
+              description: 'Last name',
+              example: 'Doe',
+            },
+            role_id: {
+              type: 'integer',
+              nullable: true,
+              description: 'Foreign key to roles table',
+              example: 1,
             },
             role: {
-              type: "string",
+              type: 'string',
               nullable: true,
-              description: "User role name",
-              example: "admin",
+              description: 'User role name (populated via JOIN)',
+              example: 'admin',
+            },
+            status: {
+              type: 'string',
+              description: 'User lifecycle state',
+              enum: ['pending_activation', 'active', 'suspended'],
+              example: 'active',
+            },
+            is_active: {
+              type: 'boolean',
+              description: 'Soft delete flag - false indicates deactivated user',
+              example: true,
             },
             created_at: {
-              type: "string",
-              format: "date-time",
-              description: "Account creation timestamp",
+              type: 'string',
+              format: 'date-time',
+              description: 'Account creation timestamp',
+            },
+            updated_at: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Last update timestamp',
             },
           },
         },
         Role: {
-          type: "object",
+          type: 'object',
           properties: {
             id: {
-              type: "integer",
-              description: "Role ID",
+              type: 'integer',
+              description: 'Role ID',
               example: 1,
             },
             name: {
-              type: "string",
-              description: "Role name",
-              example: "admin",
+              type: 'string',
+              description: 'Role name',
+              example: 'admin',
             },
             description: {
-              type: "string",
+              type: 'string',
               nullable: true,
-              description: "Role description",
-              example: "Administrator with full system access",
+              description: 'Role description',
+              example: 'Administrator with full system access',
+            },
+            priority: {
+              type: 'integer',
+              description: 'Role priority level (higher = more privileged)',
+              example: 5,
+              minimum: 1,
+            },
+            is_active: {
+              type: 'boolean',
+              description: 'Soft delete flag - false indicates deactivated role',
+              example: true,
             },
             created_at: {
-              type: "string",
-              format: "date-time",
-              description: "Role creation timestamp",
+              type: 'string',
+              format: 'date-time',
+              description: 'Role creation timestamp',
+            },
+            updated_at: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Last update timestamp',
             },
           },
         },
         Session: {
-          type: "object",
+          type: 'object',
           properties: {
             id: {
-              type: "string",
-              format: "uuid",
-              description: "Session token ID",
+              type: 'string',
+              format: 'uuid',
+              description: 'Session token ID',
             },
             createdAt: {
-              type: "string",
-              format: "date-time",
-              description: "Session creation time",
+              type: 'string',
+              format: 'date-time',
+              description: 'Session creation time',
             },
             lastUsedAt: {
-              type: "string",
-              format: "date-time",
-              description: "Last activity time",
+              type: 'string',
+              format: 'date-time',
+              description: 'Last activity time',
             },
             expiresAt: {
-              type: "string",
-              format: "date-time",
-              description: "Session expiration time",
+              type: 'string',
+              format: 'date-time',
+              description: 'Session expiration time',
             },
             ipAddress: {
-              type: "string",
+              type: 'string',
               nullable: true,
-              description: "IP address",
-              example: "192.168.1.1",
+              description: 'IP address',
+              example: '192.168.1.1',
             },
             userAgent: {
-              type: "string",
+              type: 'string',
               nullable: true,
-              description: "Browser/client user agent",
+              description: 'Browser/client user agent',
             },
             isCurrent: {
-              type: "boolean",
-              description: "Whether this is the current session",
+              type: 'boolean',
+              description: 'Whether this is the current session',
             },
           },
         },
         HealthStatus: {
-          type: "object",
+          type: 'object',
           properties: {
             status: {
-              type: "string",
-              enum: ["healthy", "degraded", "critical"],
-              description: "Overall system health status",
+              type: 'string',
+              enum: ['healthy', 'degraded', 'critical'],
+              description: 'Overall system health status',
             },
             timestamp: {
-              type: "string",
-              format: "date-time",
+              type: 'string',
+              format: 'date-time',
             },
             uptime: {
-              type: "number",
-              description: "Server uptime in seconds",
+              type: 'number',
+              description: 'Server uptime in seconds',
             },
             environment: {
-              type: "string",
-              example: "development",
+              type: 'string',
+              example: 'development',
             },
             version: {
-              type: "string",
-              example: "1.0.0",
+              type: 'string',
+              example: '1.0.0',
             },
             services: {
-              type: "object",
+              type: 'object',
               properties: {
                 database: {
-                  type: "object",
+                  type: 'object',
                   properties: {
                     status: {
-                      type: "string",
-                      enum: ["healthy", "unhealthy"],
+                      type: 'string',
+                      enum: ['healthy', 'unhealthy'],
                     },
                     database: {
-                      type: "string",
+                      type: 'string',
                     },
                     type: {
-                      type: "string",
-                      example: "PostgreSQL",
+                      type: 'string',
+                      example: 'PostgreSQL',
                     },
                   },
                 },
                 memory: {
-                  type: "object",
+                  type: 'object',
                   properties: {
                     status: {
-                      type: "string",
-                      enum: ["normal", "warning", "critical"],
+                      type: 'string',
+                      enum: ['normal', 'warning', 'critical'],
                     },
                     memory: {
-                      type: "string",
-                      example: "42MB",
+                      type: 'string',
+                      example: '42MB',
                     },
                   },
                 },
@@ -278,34 +315,34 @@ const options = {
     },
     tags: [
       {
-        name: "Health",
-        description: "System health and monitoring endpoints",
+        name: 'Health',
+        description: 'System health and monitoring endpoints',
       },
       {
-        name: "Authentication",
+        name: 'Authentication',
         description:
-          "User authentication and session management (Development mode)",
+          'User authentication and session management (Development mode)',
       },
       {
-        name: "Auth0",
-        description: "Auth0 OAuth2/OIDC endpoints (Production mode - stubs)",
+        name: 'Auth0',
+        description: 'Auth0 OAuth2/OIDC endpoints (Production mode - stubs)',
       },
       {
-        name: "Users",
-        description: "User management endpoints (admin only)",
+        name: 'Users',
+        description: 'User management endpoints (admin only)',
       },
       {
-        name: "Roles",
-        description: "Role management and user-role assignment",
+        name: 'Roles',
+        description: 'Role management and user-role assignment',
       },
       {
-        name: "Development",
-        description: "Development-only utilities (disabled in production)",
+        name: 'Development',
+        description: 'Development-only utilities (disabled in production)',
       },
     ],
   },
   // Path to the API routes files with JSDoc comments
-  apis: ["./server.js", "./routes/*.js"],
+  apis: ['./server.js', './routes/*.js'],
 };
 
 const swaggerSpec = swaggerJsdoc(options);

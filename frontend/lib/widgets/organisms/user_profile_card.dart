@@ -7,6 +7,7 @@ library;
 import 'package:flutter/material.dart';
 import '../../config/app_spacing.dart';
 import '../../config/app_colors.dart';
+import '../../utils/helpers/string_helper.dart';
 
 class UserProfileCard extends StatelessWidget {
   final Map<String, dynamic>? userProfile;
@@ -60,11 +61,11 @@ class UserProfileCard extends StatelessWidget {
     // Extract user data
     final firstName = userProfile?['first_name'] ?? '';
     final lastName = userProfile?['last_name'] ?? '';
-    final fullName = '$firstName $lastName'.trim();
+    final fullName = StringHelper.trim('$firstName $lastName');
     final displayName = fullName.isNotEmpty ? fullName : 'User';
     final email = userProfile?['email'] ?? 'No email';
     final role = userProfile?['role'] ?? 'User';
-    final initial = displayName.isNotEmpty ? displayName[0].toUpperCase() : 'U';
+    final initial = StringHelper.getInitial(displayName);
 
     return Card(
       elevation: 2,
@@ -88,7 +89,7 @@ class UserProfileCard extends StatelessWidget {
                   ),
                 ),
                 SizedBox(width: spacing.lg),
-                Expanded(
+                Flexible(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -142,7 +143,7 @@ class UserProfileCard extends StatelessWidget {
               context,
               icon: Icons.badge,
               label: 'Role',
-              value: role.toUpperCase(),
+              value: StringHelper.toUpperCase(role),
               valueColor: AppColors.brandPrimary,
             ),
           ],
@@ -166,7 +167,7 @@ class UserProfileCard extends StatelessWidget {
       children: [
         Icon(icon, size: spacing.iconSizeMD, color: AppColors.textSecondary),
         SizedBox(width: spacing.md),
-        Expanded(
+        Flexible(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

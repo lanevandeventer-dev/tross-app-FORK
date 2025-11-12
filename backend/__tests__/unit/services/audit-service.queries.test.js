@@ -8,10 +8,20 @@
  */
 
 // Mock dependencies BEFORE requiring the module
-jest.mock("../../../db/connection");
-jest.mock("../../../config/logger");
+jest.mock("../../../db/connection", () => ({
+  query: jest.fn(),
+}));
 
-const { pool } = require("../../../db/connection");
+jest.mock("../../../config/logger", () => ({
+  logger: {
+    info: jest.fn(),
+    error: jest.fn(),
+    warn: jest.fn(),
+    debug: jest.fn(),
+  },
+}));
+
+const db = require("../../../db/connection");
 const { logger } = require("../../../config/logger");
 const auditService = require("../../../services/audit-service");
 const {
@@ -24,11 +34,11 @@ describe("services/audit-service.js - Query Operations", () => {
     jest.clearAllMocks();
 
     // Mock logger methods
-    logger.info = jest.fn();
-    logger.error = jest.fn();
+    logger.info.mockImplementation(() => {});
+    logger.error.mockImplementation(() => {});
 
-    // Mock pool.query by default
-    pool.query = jest.fn().mockResolvedValue({ rows: [], rowCount: 0 });
+    // Mock db.query by default
+    db.query.mockResolvedValue({ rows: [], rowCount: 0 });
   });
 
   describe("getUserAuditTrail()", () => {
@@ -38,14 +48,14 @@ describe("services/audit-service.js - Query Operations", () => {
         { id: 1, user_id: 1, action: "login", created_at: "2025-01-01" },
         { id: 2, user_id: 1, action: "logout", created_at: "2025-01-02" },
       ];
-      pool.query.mockResolvedValue({ rows: mockLogs });
+      db.query.mockResolvedValue({ rows: mockLogs });
 
       // Act
       const result = await auditService.getUserAuditTrail(1);
 
       // Assert
       expect(result).toEqual(mockLogs);
-      expect(pool.query).toHaveBeenCalledWith(
+      expect(db.query).toHaveBeenCalledWith(
         expect.stringContaining("WHERE user_id = $1"),
         [1, 100], // default limit
       );
@@ -53,24 +63,24 @@ describe("services/audit-service.js - Query Operations", () => {
 
     test("should use custom limit when provided", async () => {
       // Arrange
-      pool.query.mockResolvedValue({ rows: [] });
+      db.query.mockResolvedValue({ rows: [] });
 
       // Act
       await auditService.getUserAuditTrail(5, 50);
 
       // Assert
-      expect(pool.query).toHaveBeenCalledWith(expect.any(String), [5, 50]);
+      expect(db.query).toHaveBeenCalledWith(expect.any(String), [5, 50]);
     });
 
     test("should order results by created_at DESC", async () => {
       // Arrange
-      pool.query.mockResolvedValue({ rows: [] });
+      db.query.mockResolvedValue({ rows: [] });
 
       // Act
       await auditService.getUserAuditTrail(1);
 
       // Assert
-      expect(pool.query).toHaveBeenCalledWith(
+      expect(db.query).toHaveBeenCalledWith(
         expect.stringContaining("ORDER BY created_at DESC"),
         expect.any(Array),
       );
@@ -88,14 +98,14 @@ describe("services/audit-service.js - Query Operations", () => {
           created_at: "2025-01-02",
         },
       ];
-      pool.query.mockResolvedValue({ rows: mockEvents });
+      db.query.mockResolvedValue({ rows: mockEvents });
 
       // Act
       const result = await auditService.getSecurityEvents();
 
       // Assert
       expect(result).toEqual(mockEvents);
-      expect(pool.query).toHaveBeenCalledWith(
+      expect(db.query).toHaveBeenCalledWith(
         expect.stringContaining("action IN ($1, $2)"),
         [AuditActions.LOGIN_FAILED, AuditActions.UNAUTHORIZED_ACCESS, 100],
       );
@@ -103,13 +113,13 @@ describe("services/audit-service.js - Query Operations", () => {
 
     test("should use custom hours and limit when provided", async () => {
       // Arrange
-      pool.query.mockResolvedValue({ rows: [] });
+      db.query.mockResolvedValue({ rows: [] });
 
       // Act
       await auditService.getSecurityEvents(48, 200);
 
       // Assert
-      expect(pool.query).toHaveBeenCalledWith(
+      expect(db.query).toHaveBeenCalledWith(
         expect.stringContaining("INTERVAL '48 hours'"),
         [AuditActions.LOGIN_FAILED, AuditActions.UNAUTHORIZED_ACCESS, 200],
       );
@@ -117,26 +127,26 @@ describe("services/audit-service.js - Query Operations", () => {
 
     test("should filter by LOGIN_FAILED and UNAUTHORIZED_ACCESS", async () => {
       // Arrange
-      pool.query.mockResolvedValue({ rows: [] });
+      db.query.mockResolvedValue({ rows: [] });
 
       // Act
       await auditService.getSecurityEvents(24, 100);
 
       // Assert
-      const callArgs = pool.query.mock.calls[0][1];
+      const callArgs = db.query.mock.calls[0][1];
       expect(callArgs[0]).toBe(AuditActions.LOGIN_FAILED);
       expect(callArgs[1]).toBe(AuditActions.UNAUTHORIZED_ACCESS);
     });
 
     test("should order results by created_at DESC", async () => {
       // Arrange
-      pool.query.mockResolvedValue({ rows: [] });
+      db.query.mockResolvedValue({ rows: [] });
 
       // Act
       await auditService.getSecurityEvents();
 
       // Assert
-      expect(pool.query).toHaveBeenCalledWith(
+      expect(db.query).toHaveBeenCalledWith(
         expect.stringContaining("ORDER BY created_at DESC"),
         expect.any(Array),
       );
@@ -150,7 +160,7 @@ describe("services/audit-service.js - Query Operations", () => {
         { id: 1, resource_type: "user", resource_id: 5, action: "create" },
         { id: 2, resource_type: "user", resource_id: 5, action: "update" },
       ];
-      pool.query.mockResolvedValue({ rows: mockLogs });
+      db.query.mockResolvedValue({ rows: mockLogs });
 
       // Act
       const result = await auditService.getResourceAuditTrail(
@@ -160,7 +170,7 @@ describe("services/audit-service.js - Query Operations", () => {
 
       // Assert
       expect(result).toEqual(mockLogs);
-      expect(pool.query).toHaveBeenCalledWith(
+      expect(db.query).toHaveBeenCalledWith(
         expect.stringContaining(
           "WHERE resource_type = $1 AND resource_id = $2",
         ),
@@ -170,13 +180,13 @@ describe("services/audit-service.js - Query Operations", () => {
 
     test("should use custom limit when provided", async () => {
       // Arrange
-      pool.query.mockResolvedValue({ rows: [] });
+      db.query.mockResolvedValue({ rows: [] });
 
       // Act
       await auditService.getResourceAuditTrail(ResourceTypes.ROLE, 10, 25);
 
       // Assert
-      expect(pool.query).toHaveBeenCalledWith(expect.any(String), [
+      expect(db.query).toHaveBeenCalledWith(expect.any(String), [
         ResourceTypes.ROLE,
         10,
         25,
@@ -187,14 +197,14 @@ describe("services/audit-service.js - Query Operations", () => {
   describe("getFailedLoginAttempts()", () => {
     test("should return count of failed login attempts", async () => {
       // Arrange
-      pool.query.mockResolvedValue({ rows: [{ count: "5" }] });
+      db.query.mockResolvedValue({ rows: [{ count: "5" }] });
 
       // Act
       const result = await auditService.getFailedLoginAttempts("192.168.1.1");
 
       // Assert
       expect(result).toBe(5);
-      expect(pool.query).toHaveBeenCalledWith(
+      expect(db.query).toHaveBeenCalledWith(
         expect.stringContaining("action = $1"),
         [AuditActions.LOGIN_FAILED, "192.168.1.1"],
       );
@@ -202,13 +212,13 @@ describe("services/audit-service.js - Query Operations", () => {
 
     test("should use custom time window when provided", async () => {
       // Arrange
-      pool.query.mockResolvedValue({ rows: [{ count: "3" }] });
+      db.query.mockResolvedValue({ rows: [{ count: "3" }] });
 
       // Act
       await auditService.getFailedLoginAttempts("127.0.0.1", 30);
 
       // Assert
-      expect(pool.query).toHaveBeenCalledWith(
+      expect(db.query).toHaveBeenCalledWith(
         expect.stringContaining("INTERVAL '30 minutes'"),
         [AuditActions.LOGIN_FAILED, "127.0.0.1"],
       );
@@ -216,7 +226,7 @@ describe("services/audit-service.js - Query Operations", () => {
 
     test("should convert string count to integer", async () => {
       // Arrange
-      pool.query.mockResolvedValue({ rows: [{ count: "10" }] });
+      db.query.mockResolvedValue({ rows: [{ count: "10" }] });
 
       // Act
       const result = await auditService.getFailedLoginAttempts("10.0.0.1");

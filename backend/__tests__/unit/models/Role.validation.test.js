@@ -6,6 +6,7 @@
 
 const Role = require("../../../db/models/Role");
 const db = require("../../../db/connection");
+const { MODEL_ERRORS } = require("../../../config/constants");
 
 // Mock the database connection
 jest.mock("../../../db/connection", () => ({
@@ -130,7 +131,7 @@ describe("Role Model - Validation", () => {
     });
 
     it("should reject update with empty name after trim", async () => {
-      await expect(Role.update(1, "   ")).rejects.toThrow(
+      await expect(Role.update(1, { name: "   " })).rejects.toThrow(
         "Role name cannot be empty",
       );
       expect(db.query).not.toHaveBeenCalled();
@@ -139,7 +140,7 @@ describe("Role Model - Validation", () => {
     it("should reject update for non-existent role", async () => {
       db.query.mockResolvedValueOnce({ rows: [] }); // findById returns nothing
 
-      await expect(Role.update(999, "new_name")).rejects.toThrow(
+      await expect(Role.update(999, { name: "new_name" })).rejects.toThrow(
         "Role not found",
       );
       expect(db.query).toHaveBeenCalledTimes(1);
@@ -149,7 +150,7 @@ describe("Role Model - Validation", () => {
       const protectedRole = { id: 1, name: "admin", created_at: "2025-01-01" };
       db.query.mockResolvedValueOnce({ rows: [protectedRole] });
 
-      await expect(Role.update(1, "super_admin")).rejects.toThrow(
+      await expect(Role.update(1, { name: "super_admin" })).rejects.toThrow(
         "Cannot modify protected role",
       );
       expect(db.query).toHaveBeenCalledTimes(1); // Only findById, no update
@@ -159,7 +160,7 @@ describe("Role Model - Validation", () => {
       const protectedRole = { id: 2, name: "client", created_at: "2025-01-02" };
       db.query.mockResolvedValueOnce({ rows: [protectedRole] });
 
-      await expect(Role.update(2, "customer")).rejects.toThrow(
+      await expect(Role.update(2, { name: "customer" })).rejects.toThrow(
         "Cannot modify protected role",
       );
     });
@@ -177,7 +178,7 @@ describe("Role Model - Validation", () => {
         .mockResolvedValueOnce({ rows: [existingRole] })
         .mockRejectedValueOnce(dbError);
 
-      await expect(Role.update(4, "admin")).rejects.toThrow(
+      await expect(Role.update(4, { name: "admin" })).rejects.toThrow(
         "Role name already exists",
       );
     });
@@ -193,7 +194,7 @@ describe("Role Model - Validation", () => {
         .mockResolvedValueOnce({ rows: [existingRole] })
         .mockResolvedValueOnce({ rows: [] }); // UPDATE returns nothing
 
-      await expect(Role.update(4, "new_name")).rejects.toThrow(
+      await expect(Role.update(4, { name: "new_name" })).rejects.toThrow(
         "Role not found",
       );
     });
@@ -210,7 +211,7 @@ describe("Role Model - Validation", () => {
         .mockResolvedValueOnce({ rows: [existingRole] })
         .mockRejectedValueOnce(dbError);
 
-      await expect(Role.update(4, "new_name")).rejects.toThrow(
+      await expect(Role.update(4, { name: "new_name" })).rejects.toThrow(
         "Connection lost",
       );
     });
@@ -267,7 +268,7 @@ describe("Role Model - Validation", () => {
         .mockResolvedValueOnce({ rows: [{ count: "5" }] }); // 5 users assigned
 
       await expect(Role.delete(4)).rejects.toThrow(
-        "Cannot delete role: users are assigned to this role",
+        MODEL_ERRORS.ROLE.USERS_ASSIGNED(5),
       );
       expect(db.query).toHaveBeenCalledTimes(2); // findById + count check, no delete
     });
@@ -284,7 +285,7 @@ describe("Role Model - Validation", () => {
         .mockResolvedValueOnce({ rows: [{ count: "1" }] }); // String '1'
 
       await expect(Role.delete(4)).rejects.toThrow(
-        "Cannot delete role: users are assigned to this role",
+        MODEL_ERRORS.ROLE.USERS_ASSIGNED(1),
       );
     });
 
@@ -300,7 +301,7 @@ describe("Role Model - Validation", () => {
         .mockResolvedValueOnce({ rows: [{ count: 3 }] }); // Number 3
 
       await expect(Role.delete(4)).rejects.toThrow(
-        "Cannot delete role: users are assigned to this role",
+        MODEL_ERRORS.ROLE.USERS_ASSIGNED(3),
       );
     });
 

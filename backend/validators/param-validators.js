@@ -6,8 +6,8 @@
  *
  * All validators attach validated values to req.validated = {}
  */
-const { toSafeInteger } = require("./type-coercion");
-const { HTTP_STATUS } = require("../config/constants");
+const { toSafeInteger } = require('./type-coercion');
+const { HTTP_STATUS } = require('../config/constants');
 
 /**
  * Create a standard validation error response
@@ -19,7 +19,7 @@ const { HTTP_STATUS } = require("../config/constants");
  */
 function createValidationError(message, field) {
   return {
-    error: "Validation Error",
+    error: 'Validation Error',
     message,
     field,
     timestamp: new Date().toISOString(),
@@ -40,7 +40,7 @@ function createValidationError(message, field) {
  * @returns {Function} Express middleware
  */
 function validateIdParam(options = {}) {
-  const { paramName = "id", min = 1, max = Number.MAX_SAFE_INTEGER } = options;
+  const { paramName = 'id', min = 1, max = Number.MAX_SAFE_INTEGER } = options;
 
   return (req, res, next) => {
     try {
@@ -52,11 +52,11 @@ function validateIdParam(options = {}) {
       });
 
       // Attach to req.validated
-      if (!req.validated) req.validated = {};
+      if (!req.validated) {req.validated = {};}
       req.validated[paramName] = validated;
 
       // LEGACY SUPPORT: Also attach to req.validatedId for backward compatibility
-      if (paramName === "id") {
+      if (paramName === 'id') {
         req.validatedId = validated;
       }
 
@@ -82,7 +82,7 @@ function validateIdParam(options = {}) {
 function validateIdParams(paramNames) {
   return (req, res, next) => {
     try {
-      if (!req.validated) req.validated = {};
+      if (!req.validated) {req.validated = {};}
 
       for (const paramName of paramNames) {
         const value = req.params[paramName];
@@ -97,7 +97,7 @@ function validateIdParams(paramNames) {
     } catch (error) {
       return res
         .status(HTTP_STATUS.BAD_REQUEST)
-        .json(createValidationError(error.message, "params"));
+        .json(createValidationError(error.message, 'params'));
     }
   };
 }
@@ -116,13 +116,13 @@ function validateIdParams(paramNames) {
  * @returns {Function} Express middleware
  */
 function validateSlugParam(options = {}) {
-  const { paramName = "slug", minLength = 1, maxLength = 100 } = options;
+  const { paramName = 'slug', minLength = 1, maxLength = 100 } = options;
   const slugPattern = /^[a-z0-9-]+$/;
 
   return (req, res, next) => {
     const value = req.params[paramName];
 
-    if (!value || typeof value !== "string") {
+    if (!value || typeof value !== 'string') {
       return res
         .status(HTTP_STATUS.BAD_REQUEST)
         .json(createValidationError(`${paramName} is required`, paramName));
@@ -152,7 +152,7 @@ function validateSlugParam(options = {}) {
         );
     }
 
-    if (!req.validated) req.validated = {};
+    if (!req.validated) {req.validated = {};}
     req.validated[paramName] = trimmed;
 
     next();

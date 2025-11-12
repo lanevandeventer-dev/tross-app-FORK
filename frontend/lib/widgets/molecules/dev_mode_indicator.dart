@@ -169,7 +169,7 @@ class DevModeBanner extends StatelessWidget {
             size: 24,
           ),
           SizedBox(width: spacing.sm),
-          Expanded(
+          Flexible(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,

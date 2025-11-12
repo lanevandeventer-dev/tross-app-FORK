@@ -14,13 +14,27 @@ jest.mock("../../../db/models/User");
 jest.mock("../../../db/models/Role");
 jest.mock("../../../services/audit-service");
 jest.mock("../../../utils/request-helpers");
-jest.mock("../../../middleware/auth");
+jest.mock("../../../middleware/auth", () => ({
+  authenticateToken: jest.fn((req, res, next) => next()),
+  requirePermission: jest.fn(() => (req, res, next) => next()),
+  requireMinimumRole: jest.fn(() => (req, res, next) => next()),
+}));
 
 // Mock validators with proper factory functions that return middleware
 jest.mock("../../../validators", () => ({
   validatePagination: jest.fn(() => (req, res, next) => {
     if (!req.validated) req.validated = {};
     req.validated.pagination = { page: 1, limit: 50, offset: 0 };
+    next();
+  }),
+  validateQuery: jest.fn(() => (req, res, next) => {
+    // Mock metadata-driven query validation
+    if (!req.validated) req.validated = {};
+    if (!req.validated.query) req.validated.query = {};
+    req.validated.query.search = req.query.search;
+    req.validated.query.filters = req.query.filters || {};
+    req.validated.query.sortBy = req.query.sortBy;
+    req.validated.query.sortOrder = req.query.sortOrder;
     next();
   }),
   validateIdParam: jest.fn((req, res, next) => {
@@ -53,7 +67,7 @@ const usersRouter = require("../../../routes/users");
 const User = require("../../../db/models/User");
 const auditService = require("../../../services/audit-service");
 const { getClientIp, getUserAgent } = require("../../../utils/request-helpers");
-const { authenticateToken, requireAdmin } = require("../../../middleware/auth");
+const { authenticateToken, requirePermission } = require("../../../middleware/auth");
 const {
   validateUserCreate,
   validateProfileUpdate,
@@ -75,7 +89,7 @@ describe("Users Routes - Validation & Error Handling", () => {
       getClientIp,
       getUserAgent,
       authenticateToken,
-      requireAdmin,
+      requirePermission,
       validateIdParam,
       validateUserCreate,
       validateProfileUpdate,
@@ -89,7 +103,7 @@ describe("Users Routes - Validation & Error Handling", () => {
   describe("GET /api/users - Error Handling", () => {
     it("should handle database errors gracefully", async () => {
       // Arrange
-      User.getAll.mockRejectedValue(new Error("Database connection failed"));
+      User.findAll.mockRejectedValue(new Error("Database connection failed"));
 
       // Act
       const response = await request(app).get("/api/users");

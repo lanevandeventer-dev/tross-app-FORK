@@ -206,9 +206,13 @@ class Auth0WebService {
 
   /// Logout - redirect to Auth0 logout
   Future<void> logout() async {
+    // Get the current origin (e.g., http://localhost:8080)
+    final origin = web.window.location.origin;
+    final returnToUrl = '$origin/login';
+
     final params = {
       'client_id': AppConfig.auth0ClientId,
-      'returnTo': 'http://localhost:8080/login',
+      'returnTo': returnToUrl,
     };
 
     final query = params.entries
@@ -216,7 +220,10 @@ class Auth0WebService {
         .join('&');
     final logoutUrl = 'https://${AppConfig.auth0Domain}/v2/logout?$query';
 
-    ErrorService.logInfo('Auth0 web logout', context: {'url': logoutUrl});
+    ErrorService.logInfo(
+      'Auth0 web logout',
+      context: {'url': logoutUrl, 'returnTo': returnToUrl},
+    );
     web.window.location.href = logoutUrl;
   }
 }

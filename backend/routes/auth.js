@@ -1,15 +1,20 @@
 // Clean authentication routes
-const express = require("express");
-const { authenticateToken, requireAdmin } = require("../middleware/auth");
-const User = require("../db/models/User");
-const Role = require("../db/models/Role");
-const userDataService = require("../services/user-data");
-const tokenService = require("../services/token-service");
-const auditService = require("../services/audit-service");
-const { HTTP_STATUS } = require("../config/constants");
-const { validateProfileUpdate } = require("../validators/body-validators");
-const { logger } = require("../config/logger");
-const { getClientIp, getUserAgent } = require("../utils/request-helpers");
+const express = require('express');
+const { authenticateToken } = require('../middleware/auth');
+const { refreshLimiter } = require('../middleware/rate-limit');
+const User = require('../db/models/User');
+const _Role = require('../db/models/Role');
+const _userDataService = require('../services/user-data');
+const _crypto = require('crypto');
+const tokenService = require('../services/token-service');
+const auditService = require('../services/audit-service');
+const { HTTP_STATUS } = require('../config/constants');
+const {
+  validateProfileUpdate,
+  validateRefreshToken,
+} = require('../validators/body-validators');
+const { logger } = require('../config/logger');
+const { getClientIp, getUserAgent } = require('../utils/request-helpers');
 
 const router = express.Router();
 
@@ -45,7 +50,7 @@ const router = express.Router();
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.get("/me", authenticateToken, async (req, res) => {
+router.get('/me', authenticateToken, async (req, res) => {
   try {
     // req.dbUser is already populated by authenticateToken middleware
     const user = req.dbUser;
@@ -53,7 +58,7 @@ router.get("/me", authenticateToken, async (req, res) => {
     // Format user data for frontend
     const formattedUser = {
       ...user,
-      name: `${user.first_name || ""} ${user.last_name || ""}`.trim() || "User",
+      name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'User',
     };
 
     res.json({
@@ -62,13 +67,13 @@ router.get("/me", authenticateToken, async (req, res) => {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    logger.error("Error getting user profile", {
+    logger.error('Error getting user profile', {
       error: error.message,
       userId: req.user?.userId,
     });
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
-      error: "Internal Server Error",
-      message: "Failed to get user profile",
+      error: 'Internal Server Error',
+      message: 'Failed to get user profile',
       timestamp: new Date().toISOString(),
     });
   }
@@ -121,7 +126,7 @@ router.get("/me", authenticateToken, async (req, res) => {
  *         description: User not found
  */
 router.put(
-  "/me",
+  '/me',
   authenticateToken,
   validateProfileUpdate,
   async (req, res) => {
@@ -129,14 +134,14 @@ router.put(
       const dbUser = await User.findByAuth0Id(req.user.sub);
       if (!dbUser) {
         return res.status(HTTP_STATUS.NOT_FOUND).json({
-          error: "User Not Found",
-          message: "User profile not found",
+          error: 'User not found',
+          message: 'User profile not found',
           timestamp: new Date().toISOString(),
         });
       }
 
       // Only allow updating certain fields
-      const allowedUpdates = ["first_name", "last_name"];
+      const allowedUpdates = ['first_name', 'last_name'];
       const updates = {};
 
       allowedUpdates.forEach((field) => {
@@ -147,8 +152,8 @@ router.put(
 
       if (Object.keys(updates).length === 0) {
         return res.status(400).json({
-          error: "Bad Request",
-          message: "No valid fields to update",
+          error: 'Bad Request',
+          message: 'No valid fields to update',
           timestamp: new Date().toISOString(),
         });
       }
@@ -159,17 +164,17 @@ router.put(
       res.json({
         success: true,
         data: updatedUser,
-        message: "Profile updated successfully",
+        message: 'Profile updated successfully',
         timestamp: new Date().toISOString(),
       });
     } catch (error) {
-      logger.error("Error updating user profile", {
+      logger.error('Error updating user profile', {
         error: error.message,
         userId: req.user?.userId,
       });
       res.status(500).json({
-        error: "Internal Server Error",
-        message: "Failed to update user profile",
+        error: 'Internal Server Error',
+        message: 'Failed to update user profile',
         timestamp: new Date().toISOString(),
       });
     }
@@ -220,63 +225,59 @@ router.put(
  *       401:
  *         description: Token expired
  */
-router.post("/refresh", async (req, res) => {
-  try {
-    const { refreshToken } = req.body;
+router.post(
+  '/refresh',
+  refreshLimiter,
+  validateRefreshToken,
+  async (req, res) => {
+    try {
+      const { refreshToken } = req.body;
 
-    if (!refreshToken) {
-      return res.status(HTTP_STATUS.BAD_REQUEST).json({
-        error: "Bad Request",
-        message: "Refresh token required",
+      const ipAddress = getClientIp(req);
+      const userAgent = getUserAgent(req);
+
+      // Generate new token pair
+      const tokens = await tokenService.refreshAccessToken(
+        refreshToken,
+        ipAddress,
+        userAgent,
+      );
+
+      // Log the refresh
+      const decoded = require('jsonwebtoken').decode(refreshToken);
+      await auditService.log({
+        userId: decoded.userId,
+        action: 'token_refresh',
+        resourceType: 'auth',
+        ipAddress,
+        userAgent,
+      });
+
+      res.json({
+        success: true,
+        data: tokens,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      logger.error('Error refreshing token', {
+        error: error.message,
+        userId: req.user?.userId,
+      });
+
+      // Return appropriate error based on failure reason
+      const status = error.message.includes('expired')
+        ? HTTP_STATUS.UNAUTHORIZED
+        : HTTP_STATUS.BAD_REQUEST;
+
+      res.status(status).json({
+        error: error.message.includes('expired')
+          ? 'Token Expired'
+          : 'Invalid Token',
+        message: error.message,
         timestamp: new Date().toISOString(),
       });
     }
-
-    const ipAddress = getClientIp(req);
-    const userAgent = getUserAgent(req);
-
-    // Generate new token pair
-    const tokens = await tokenService.refreshAccessToken(
-      refreshToken,
-      ipAddress,
-      userAgent,
-    );
-
-    // Log the refresh
-    const decoded = require("jsonwebtoken").decode(refreshToken);
-    await auditService.log({
-      userId: decoded.userId,
-      action: "token_refresh",
-      resourceType: "auth",
-      ipAddress,
-      userAgent,
-    });
-
-    res.json({
-      success: true,
-      data: tokens,
-      timestamp: new Date().toISOString(),
-    });
-  } catch (error) {
-    logger.error("Error refreshing token", {
-      error: error.message,
-      userId: req.user?.userId,
-    });
-
-    // Return appropriate error based on failure reason
-    const status = error.message.includes("expired")
-      ? HTTP_STATUS.UNAUTHORIZED
-      : HTTP_STATUS.BAD_REQUEST;
-
-    res.status(status).json({
-      error: error.message.includes("expired")
-        ? "Token Expired"
-        : "Invalid Token",
-      message: error.message,
-      timestamp: new Date().toISOString(),
-    });
-  }
-});
+  });
 
 /**
  * @openapi
@@ -303,16 +304,16 @@ router.post("/refresh", async (req, res) => {
  *       401:
  *         description: Unauthorized
  */
-router.post("/logout", authenticateToken, async (req, res) => {
+router.post('/logout', authenticateToken, async (req, res) => {
   try {
     const { refreshToken } = req.body;
     const ipAddress = getClientIp(req);
     const userAgent = getUserAgent(req);
 
     if (refreshToken) {
-      const decoded = require("jsonwebtoken").decode(refreshToken);
+      const decoded = require('jsonwebtoken').decode(refreshToken);
       if (decoded && decoded.tokenId) {
-        await tokenService.revokeToken(decoded.tokenId, "logout");
+        await tokenService.revokeToken(decoded.tokenId, 'logout');
       }
     }
 
@@ -322,26 +323,26 @@ router.post("/logout", authenticateToken, async (req, res) => {
     // Log the logout
     await auditService.log({
       userId, // Now handles null safely for dev users
-      action: "logout",
-      resourceType: "auth",
+      action: 'logout',
+      resourceType: 'auth',
       ipAddress,
       userAgent,
     });
 
     res.json({
       success: true,
-      message: "Logged out successfully",
+      message: 'Logged out successfully',
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    logger.error("Error during logout", {
+    logger.error('Error during logout', {
       error: error.message,
       userId: req.user?.userId || req.user?.sub,
       tokenId: req.user?.tokenId,
     });
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
-      error: "Internal Server Error",
-      message: "Failed to logout",
+      error: 'Internal Server Error',
+      message: 'Failed to logout',
       timestamp: new Date().toISOString(),
     });
   }
@@ -380,23 +381,23 @@ router.post("/logout", authenticateToken, async (req, res) => {
  *       401:
  *         description: Unauthorized
  */
-router.post("/logout-all", authenticateToken, async (req, res) => {
+router.post('/logout-all', authenticateToken, async (req, res) => {
   try {
     const count = await tokenService.revokeAllUserTokens(
       req.user.userId,
-      "logout_all",
+      'logout_all',
     );
     const ipAddress = getClientIp(req);
     const userAgent = getUserAgent(req);
 
     await auditService.log({
       userId: req.user.userId,
-      action: "logout_all_devices",
-      resourceType: "auth",
+      action: 'logout_all_devices',
+      resourceType: 'auth',
       newValues: { tokensRevoked: count },
       ipAddress,
       userAgent,
-      result: "success",
+      result: 'success',
     });
 
     res.json({
@@ -406,13 +407,13 @@ router.post("/logout-all", authenticateToken, async (req, res) => {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    logger.error("Error during logout-all", {
+    logger.error('Error during logout-all', {
       error: error.message,
       userId: req.user?.userId,
     });
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
-      error: "Internal Server Error",
-      message: "Failed to logout from all devices",
+      error: 'Internal Server Error',
+      message: 'Failed to logout from all devices',
       timestamp: new Date().toISOString(),
     });
   }
@@ -447,7 +448,7 @@ router.post("/logout-all", authenticateToken, async (req, res) => {
  *       401:
  *         description: Unauthorized
  */
-router.get("/sessions", authenticateToken, async (req, res) => {
+router.get('/sessions', authenticateToken, async (req, res) => {
   try {
     const tokens = await tokenService.getUserTokens(req.user.userId);
 
@@ -468,13 +469,13 @@ router.get("/sessions", authenticateToken, async (req, res) => {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    logger.error("Error getting sessions", {
+    logger.error('Error getting sessions', {
       error: error.message,
       userId: req.user?.userId,
     });
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
-      error: "Internal Server Error",
-      message: "Failed to get active sessions",
+      error: 'Internal Server Error',
+      message: 'Failed to get active sessions',
       timestamp: new Date().toISOString(),
     });
   }

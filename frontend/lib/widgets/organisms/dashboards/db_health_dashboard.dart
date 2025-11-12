@@ -25,20 +25,19 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import '../../../config/app_spacing.dart';
 import '../../../models/database_health.dart';
 import '../../../services/database_health_service.dart';
 import '../../../config/constants.dart';
+import '../../../utils/helpers/status_helper.dart';
 import '../../molecules/dashboard_card.dart';
 import '../../molecules/health_status_box.dart';
-import '../../molecules/database_card.dart';
 import '../../molecules/cards/database_health_card.dart';
 import '../../molecules/empty_state.dart';
 import '../../atoms/indicators/connection_status_badge.dart';
 import '../../atoms/indicators/loading_indicator.dart';
 import '../../helpers/refreshable_data_widget.dart';
 import '../../molecules/error_card.dart';
-import '../../molecules/error_action_buttons.dart';
+import '../../molecules/buttons/button_group.dart';
 
 /// Organism component for displaying database health dashboard
 class DbHealthDashboard extends StatelessWidget {
@@ -90,8 +89,6 @@ class DbHealthDashboard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final spacing = context.spacing;
-
     return RefreshableDataWidget<DatabasesHealthResponse>(
       fetchData: healthService.fetchHealth,
       autoRefresh: autoRefresh,
@@ -104,7 +101,14 @@ class DbHealthDashboard extends StatelessWidget {
       errorBuilder: (error, retry) => ErrorCard(
         title: 'Failed to Load Health Data',
         message: error.toString().replaceAll('Exception: ', ''),
-        actions: [ErrorAction.retry(onRetry: (_) async => retry())],
+        buttons: [
+          ButtonConfig(
+            label: 'Retry',
+            icon: Icons.refresh,
+            onPressed: retry,
+            isPrimary: true,
+          ),
+        ],
       ),
       builder: (context, healthData, isRefreshing, onManualRefresh) {
         final overallStatus = healthData.overallStatus;
@@ -117,34 +121,37 @@ class DbHealthDashboard extends StatelessWidget {
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             DashboardCard(
-              child: HealthStatusBox(
-                onRefresh: onManualRefresh,
-                child: ConnectionStatusBadge(
-                  status: overallStatus,
-                  label: _getOverallStatusLabel(overallStatus),
-                ),
-                subtitle:
-                    '${databases.length} ${databases.length == 1 ? 'database' : 'databases'}',
-                isRefreshing: isRefreshing,
-              ),
               width: 300,
               minWidth: 220,
               maxWidth: 340,
+              child: HealthStatusBox(
+                onRefresh: onManualRefresh,
+                subtitle:
+                    '${databases.length} ${databases.length == 1 ? 'database' : 'databases'}',
+                isRefreshing: isRefreshing,
+                child: ConnectionStatusBadge(
+                  status: overallStatus,
+                  label: StatusHelper.getHealthStatusLabel(overallStatus),
+                ),
+              ),
             ),
             if (databases.isEmpty)
               DashboardCard(
+                width: 300,
+                minWidth: 220,
+                maxWidth: 340,
                 child: EmptyState(
                   icon: Icons.storage_outlined,
                   title: 'No Databases',
                   message: 'No database health information available',
                 ),
-                width: 300,
-                minWidth: 220,
-                maxWidth: 340,
               )
             else
               ...databases.map((db) {
                 return DashboardCard(
+                  width: 300,
+                  minWidth: 220,
+                  maxWidth: 340,
                   child: DatabaseHealthCard(
                     databaseName: db.name,
                     status: db.status,
@@ -154,28 +161,11 @@ class DbHealthDashboard extends StatelessWidget {
                     errorMessage: db.errorMessage,
                     showDetails: true,
                   ),
-                  width: 300,
-                  minWidth: 220,
-                  maxWidth: 340,
                 );
               }),
           ],
         );
       },
     );
-  }
-
-  // Helper: Get human-readable overall status label
-  String _getOverallStatusLabel(HealthStatus status) {
-    switch (status) {
-      case HealthStatus.healthy:
-        return 'All Systems Operational';
-      case HealthStatus.degraded:
-        return 'System Degraded';
-      case HealthStatus.critical:
-        return 'System Critical';
-      case HealthStatus.unknown:
-        return 'Status Unknown';
-    }
   }
 }

@@ -133,7 +133,7 @@ class Auth0PlatformService {
     try {
       if (isWeb) {
         // Web: refresh via backend API
-        // TODO: Implement backend refresh endpoint
+        // Future: Implement backend refresh endpoint
         throw UnimplementedError(
           'Web token refresh via backend not yet implemented',
         );

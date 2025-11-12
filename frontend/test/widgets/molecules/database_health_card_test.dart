@@ -13,6 +13,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:tross_app/models/database_health.dart';
 import 'package:tross_app/widgets/molecules/cards/database_health_card.dart';
 import 'package:tross_app/widgets/atoms/indicators/connection_status_badge.dart';
 import 'package:tross_app/config/app_colors.dart';

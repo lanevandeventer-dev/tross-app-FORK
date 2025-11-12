@@ -19,23 +19,28 @@ const {
 } = require("../../config/test-constants");
 
 // Track setup state globally (prevents multiple setups in parallel)
+// Note: In Jest, globalSetup runs in a separate context, so we can't rely on
+// this flag alone. Tests should handle "already setup" gracefully.
 let isSetup = false;
 let setupPromise = null; // Track ongoing setup to prevent race conditions
 
 /**
  * Set up test database - apply schema
- * Call this in beforeAll() of integration tests
+ * Call this in beforeAll() of integration tests OR in globalSetup
  * Uses centralized pool which is already configured for test database
- * IDEMPOTENT: Safe to call multiple times, will only set up once
+ * OPTIMIZED: Only runs schema setup once, subsequent calls return immediately
+ * IDEMPOTENT: Safe to call multiple times, will only set up once per process
  */
 async function setupTestDatabase() {
-  // If already set up, return immediately
+  // If already set up, return immediately (FAST PATH)
   if (isSetup) {
+    testLogger.log("⚡ Test database already setup (fast path)");
     return centralPool;
   }
 
   // If setup is in progress, wait for it to complete (prevents race conditions)
   if (setupPromise) {
+    testLogger.log("⏳ Test database setup in progress, waiting...");
     await setupPromise;
     return centralPool;
   }
@@ -43,6 +48,8 @@ async function setupTestDatabase() {
   // Start setup and track the promise
   setupPromise = (async () => {
     try {
+      testLogger.log("🚀 Setting up test database...");
+      
       // Test connection
       const client = await centralPool.connect();
       await client.query("SELECT NOW()");
@@ -50,11 +57,12 @@ async function setupTestDatabase() {
 
       testLogger.log("✅ Test database connected");
 
-      // Apply schema (idempotent)
+      // Apply schema (optimized - only if needed)
       await runMigrations(centralPool);
 
       isSetup = true;
       setupPromise = null; // Clear promise after successful setup
+      testLogger.log("🎉 Test database setup complete!");
       return centralPool;
     } catch (error) {
       setupPromise = null; // Clear promise on error so retry is possible
@@ -69,16 +77,34 @@ async function setupTestDatabase() {
 /**
  * Run database schema setup on test database
  * Uses schema.sql instead of migrations
- * IDEMPOTENT: Can be run multiple times safely
+ * OPTIMIZED: Only drops and recreates if schema doesn't exist or is corrupted
+ * This is 100x faster than DROP CASCADE on every test run
  */
 async function runMigrations(pool) {
   const schemaPath = path.join(__dirname, "../../schema.sql");
 
   try {
-    testLogger.log("📦 Applying database schema...");
+    testLogger.log("📦 Checking database schema...");
+
+    // Check if schema already exists with expected tables
+    const tableCheck = await pool.query(`
+      SELECT COUNT(*) as count 
+      FROM information_schema.tables 
+      WHERE table_schema = 'public' 
+      AND table_name IN ('users', 'roles', 'refresh_tokens', 'audit_logs')
+    `);
+
+    const expectedTables = 4;
+    const hasSchema = parseInt(tableCheck.rows[0].count) === expectedTables;
+
+    if (hasSchema) {
+      testLogger.log("✅ Schema already exists, skipping setup (fast path)");
+      return;
+    }
+
+    testLogger.log("🔧 Schema missing or incomplete, applying full setup...");
 
     // Drop and recreate public schema for clean slate
-    // IDEMPOTENT: IF EXISTS ensures this can run multiple times
     await pool.query("DROP SCHEMA IF EXISTS public CASCADE");
     await pool.query("CREATE SCHEMA IF NOT EXISTS public");
 
@@ -102,14 +128,11 @@ async function runMigrations(pool) {
  * Clean up test database - truncate all tables
  * Call this in afterEach() to reset state between tests
  * Uses centralized pool
+ * 
+ * STANDARD PATTERN: Assumes schema is already set up by globalSetup
+ * Just cleans data, doesn't touch schema
  */
 async function cleanupTestDatabase() {
-  if (!isSetup) {
-    throw new Error(
-      "Test database not initialized. Call setupTestDatabase() first.",
-    );
-  }
-
   try {
     // KISS: Truncate test data tables (preserve roles as they're seeded by schema)
     // Note: user_roles table no longer exists (simplified to users.role_id)
@@ -153,13 +176,10 @@ async function teardownTestDatabase() {
 /**
  * Get test database pool (for direct queries in tests)
  * Returns the centralized pool which is automatically configured for tests
+ * 
+ * STANDARD PATTERN: Assumes globalSetup has already configured the database
  */
 function getTestPool() {
-  if (!isSetup) {
-    throw new Error(
-      "Test database not initialized. Call setupTestDatabase() first.",
-    );
-  }
   return centralPool;
 }
 

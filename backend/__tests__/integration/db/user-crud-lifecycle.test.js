@@ -18,7 +18,6 @@
 const request = require("supertest");
 const app = require("../../../server");
 const {
-  setupTestDatabase,
   cleanupTestDatabase,
   createTestUser,
 } = require("../../helpers/test-db");
@@ -33,8 +32,8 @@ describe("User CRUD Lifecycle Tests", () => {
   let clientToken;
   let clientUser;
 
+  // STANDARD PATTERN: Create test users once for all lifecycle tests
   beforeAll(async () => {
-    // Database already set up by global setup
     const adminData = await createTestUser("admin");
     adminToken = adminData.token;
     adminUser = adminData.user;
@@ -44,6 +43,7 @@ describe("User CRUD Lifecycle Tests", () => {
     clientUser = clientData.user;
   });
 
+  // Clean up once after all tests complete
   afterAll(async () => {
     await cleanupTestDatabase();
   });
@@ -109,7 +109,7 @@ describe("User CRUD Lifecycle Tests", () => {
       lifecycleUser = response.body.data;
     });
 
-    it("4. DELETE: Should soft delete the user", async () => {
+    it("4. DELETE: Should permanently delete the user", async () => {
       expect(lifecycleUser).not.toBeNull();
 
       const response = await request(app)
@@ -120,10 +120,9 @@ describe("User CRUD Lifecycle Tests", () => {
       expect(response.body.success).toBe(true);
       expect(response.body.message).toBe("User deleted successfully");
 
-      // Verify soft deletion
+      // Verify permanent deletion (user should not exist)
       const deletedUser = await User.findById(lifecycleUser.id);
-      expect(deletedUser).not.toBeNull();
-      expect(deletedUser.is_active).toBe(false);
+      expect(deletedUser).toBeNull(); // User completely removed from database
     });
 
     it("5. AUDIT: Should have logged all lifecycle operations", async () => {

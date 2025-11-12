@@ -19,7 +19,7 @@ class LoginHeader extends StatelessWidget {
 
     return Column(
       children: [
-        AppLogo(size: spacing.xxl * 3.75), // ~120 relative to base
+        AppLogo(size: spacing.xxxl * 2),
         SizedBox(height: spacing.xl),
         AppTitle(title: title, subtitle: subtitle),
       ],

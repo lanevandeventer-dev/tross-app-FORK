@@ -4,13 +4,20 @@
  * ALWAYS uses Auth0Strategy - independent of AUTH_MODE.
  * This allows Auth0 login to work alongside dev auth.
  */
-const express = require("express");
-const crypto = require("crypto");
-const Auth0Strategy = require("../services/auth/Auth0Strategy");
-const tokenService = require("../services/token-service");
-const auditService = require("../services/audit-service");
-const { HTTP_STATUS } = require("../config/constants");
-const { logger } = require("../config/logger");
+const express = require('express');
+const _crypto = require('crypto');
+const _User = require('../db/models/User');
+const Auth0Strategy = require('../services/auth/Auth0Strategy');
+const tokenService = require('../services/token-service');
+const auditService = require('../services/audit-service');
+const { HTTP_STATUS } = require('../config/constants');
+const { logger } = require('../config/logger');
+const { refreshLimiter } = require('../middleware/rate-limit');
+const {
+  validateAuthCallback,
+  validateAuth0Token,
+  validateAuth0Refresh,
+} = require('../validators');
 
 const router = express.Router();
 
@@ -23,25 +30,19 @@ const auth0Strategy = new Auth0Strategy();
  *
  * ALWAYS uses Auth0Strategy - works regardless of AUTH_MODE
  */
-router.post("/callback", async (req, res) => {
+router.post('/callback', validateAuthCallback, async (req, res) => {
   try {
     const { code, redirect_uri } = req.body;
 
-    if (!code) {
-      return res.status(HTTP_STATUS.BAD_REQUEST).json({
-        error: "Authorization code required",
-      });
-    }
-
-    logger.info("🔐 Auth0 callback: Exchanging authorization code for tokens");
+    logger.info('🔐 Auth0 callback: Exchanging authorization code for tokens');
 
     // Use Auth0 strategy directly - always works regardless of AUTH_MODE
     const authResult = await auth0Strategy.authenticate({
       code,
-      redirect_uri: redirect_uri || "http://localhost:8080/callback",
+      redirect_uri: redirect_uri || 'http://localhost:8080/callback',
     });
 
-    logger.info("🔐 Auth0 authentication successful", {
+    logger.info('🔐 Auth0 authentication successful', {
       userId: authResult.user.id,
       email: authResult.user.email,
       role: authResult.user.role,
@@ -49,7 +50,7 @@ router.post("/callback", async (req, res) => {
 
     // Generate refresh token pair
     const ipAddress = req.ip || req.connection.remoteAddress;
-    const userAgent = req.headers["user-agent"];
+    const userAgent = req.headers['user-agent'];
     const tokens = await tokenService.generateTokenPair(
       authResult.user,
       ipAddress,
@@ -59,8 +60,8 @@ router.post("/callback", async (req, res) => {
     // Log successful login
     await auditService.log({
       userId: authResult.user.id,
-      action: "login",
-      resourceType: "auth",
+      action: 'login',
+      resourceType: 'auth',
       ipAddress,
       userAgent,
     });
@@ -70,30 +71,30 @@ router.post("/callback", async (req, res) => {
       access_token: tokens.accessToken,
       refresh_token: tokens.refreshToken,
       user: authResult.user,
-      provider: "auth0",
+      provider: 'auth0',
     });
   } catch (error) {
-    logger.error("🔐 Auth0 callback failed", {
+    logger.error('🔐 Auth0 callback failed', {
       error: error.message,
       stack: error.stack,
     });
 
     // Log failed login attempt
     const ipAddress = req.ip || req.connection.remoteAddress;
-    const userAgent = req.headers["user-agent"];
+    const userAgent = req.headers['user-agent'];
     await auditService.log({
       userId: null,
-      action: "login_failed",
-      resourceType: "auth",
-      newValues: { email: req.body.email || "unknown", reason: error.message },
+      action: 'login_failed',
+      resourceType: 'auth',
+      newValues: { email: req.body.email || 'unknown', reason: error.message },
       ipAddress,
       userAgent,
-      result: "failure",
+      result: 'failure',
       errorMessage: error.message,
     });
 
     res.status(401).json({
-      error: "Authentication failed",
+      error: 'Authentication failed',
       message: error.message,
     });
   }
@@ -105,22 +106,15 @@ router.post("/callback", async (req, res) => {
  *
  * ALWAYS uses Auth0Strategy - works regardless of AUTH_MODE
  */
-router.post("/validate", async (req, res) => {
+router.post('/validate', validateAuth0Token, async (req, res) => {
   try {
     // Extract ID token from request body (frontend sends it there)
     const { id_token } = req.body;
 
-    if (!id_token) {
-      return res.status(HTTP_STATUS.UNAUTHORIZED).json({
-        error: "Missing ID token",
-        message: "ID token required in request body",
-      });
-    }
-
     // Use Auth0 strategy to validate ID token and generate app token
     const result = await auth0Strategy.validateIdToken(id_token);
 
-    logger.info("🔐 Auth0: User authenticated", {
+    logger.info('🔐 Auth0: User authenticated', {
       userId: result.user.id,
       email: result.user.email,
     });
@@ -129,15 +123,15 @@ router.post("/validate", async (req, res) => {
       token: result.token,
       app_token: result.token,
       user: result.user,
-      provider: "auth0",
+      provider: 'auth0',
     });
   } catch (error) {
-    logger.error("🔐 Auth0 token validation failed", {
+    logger.error('🔐 Auth0 token validation failed', {
       error: error.message,
     });
 
     res.status(HTTP_STATUS.UNAUTHORIZED).json({
-      error: "Token validation failed",
+      error: 'Token validation failed',
       message: error.message,
     });
   }
@@ -147,15 +141,9 @@ router.post("/validate", async (req, res) => {
  * POST /api/auth0/refresh
  * Refresh access token using refresh token
  */
-router.post("/refresh", async (req, res) => {
+router.post('/refresh', refreshLimiter, validateAuth0Refresh, async (req, res) => {
   try {
     const { refresh_token } = req.body;
-
-    if (!refresh_token) {
-      return res.status(HTTP_STATUS.BAD_REQUEST).json({
-        error: "Refresh token required",
-      });
-    }
 
     const result = await auth0Strategy.refreshToken(refresh_token);
 
@@ -164,10 +152,10 @@ router.post("/refresh", async (req, res) => {
       expires_in: result.expires_in,
     });
   } catch (error) {
-    logger.error("Token refresh failed", { error: error.message });
+    logger.error('Token refresh failed', { error: error.message });
 
     res.status(HTTP_STATUS.UNAUTHORIZED).json({
-      error: "Token refresh failed",
+      error: 'Token refresh failed',
       message: error.message,
     });
   }
@@ -177,20 +165,20 @@ router.post("/refresh", async (req, res) => {
  * GET /api/auth0/logout
  * Get Auth0 logout URL
  */
-router.get("/logout", async (req, res) => {
+router.get('/logout', async (req, res) => {
   try {
     const result = await auth0Strategy.logout();
 
     res.json({
       success: true,
       logout_url: result.logoutUrl,
-      message: "Redirect to logout_url to complete Auth0 logout",
+      message: 'Redirect to logout_url to complete Auth0 logout',
     });
   } catch (error) {
-    logger.error("Logout failed", { error: error.message });
+    logger.error('Logout failed', { error: error.message });
 
     res.status(HTTP_STATUS.SERVER_ERROR).json({
-      error: "Logout failed",
+      error: 'Logout failed',
       message: error.message,
     });
   }

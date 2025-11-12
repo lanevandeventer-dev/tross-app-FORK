@@ -6,10 +6,10 @@
  * This file focuses on: headers, input sanitization, and general security.
  */
 
-const helmet = require("helmet");
-const mongoSanitize = require("express-mongo-sanitize");
-const { SECURITY } = require("../config/constants");
-const { logger } = require("../config/logger");
+const helmet = require('helmet');
+const _mongoSanitize = require('express-mongo-sanitize');
+const { SECURITY } = require('../config/constants');
+const { logger: _logger } = require('../config/logger');
 
 /**
  * Input sanitization middleware
@@ -18,22 +18,22 @@ const { logger } = require("../config/logger");
 const sanitizeInput = () => {
   return (req, res, next) => {
     // Fields that should NOT be sanitized (contain dots by design)
-    const EXCLUDED_FIELDS = ["id_token", "access_token", "refresh_token"];
+    const EXCLUDED_FIELDS = ['id_token', 'access_token', 'refresh_token'];
 
     // Manual sanitization to avoid the read-only property issue
-    const sanitizeObject = (obj, parentKey = "") => {
-      if (obj && typeof obj === "object") {
+    const sanitizeObject = (obj, _parentKey = '') => {
+      if (obj && typeof obj === 'object') {
         Object.keys(obj).forEach((key) => {
           // Skip sanitization for JWT tokens and email fields
-          if (EXCLUDED_FIELDS.includes(key) || key === "email") {
+          if (EXCLUDED_FIELDS.includes(key) || key === 'email') {
             return; // Don't sanitize JWT tokens or emails!
           }
 
-          if (typeof obj[key] === "string") {
+          if (typeof obj[key] === 'string') {
             // Remove MongoDB operators (we use PostgreSQL but this prevents injection attempts)
             // Only replace leading $ signs, not dots in general text
-            obj[key] = obj[key].replace(/^\$/, "_");
-          } else if (typeof obj[key] === "object") {
+            obj[key] = obj[key].replace(/^\$/, '_');
+          } else if (typeof obj[key] === 'object') {
             sanitizeObject(obj[key], key);
           }
         });
@@ -57,7 +57,7 @@ const sanitizeInput = () => {
  * Environment-aware: Stricter policies in production, relaxed for Flutter development
  */
 const securityHeaders = () => {
-  const isDevelopment = process.env.NODE_ENV !== "production";
+  const isDevelopment = process.env.NODE_ENV !== 'production';
 
   return helmet({
     contentSecurityPolicy: {
@@ -70,16 +70,16 @@ const securityHeaders = () => {
         scriptSrc: [SECURITY.HEADERS.CSP_SELF],
         // Allow all HTTPS images in dev (Flutter hot reload), restrict to CDN in production
         imgSrc: isDevelopment
-          ? [SECURITY.HEADERS.CSP_SELF, "data:", "https:"]
-          : [SECURITY.HEADERS.CSP_SELF, "data:", "https://cdn.trossapp.com"],
+          ? [SECURITY.HEADERS.CSP_SELF, 'data:', 'https:']
+          : [SECURITY.HEADERS.CSP_SELF, 'data:', 'https://cdn.trossapp.com'],
         // Allow all connections in dev, restrict to API domain in production
         connectSrc: isDevelopment
-          ? [SECURITY.HEADERS.CSP_SELF, "*"]
+          ? [SECURITY.HEADERS.CSP_SELF, '*']
           : [
-              SECURITY.HEADERS.CSP_SELF,
-              "https://api.trossapp.com",
-              "https://*.auth0.com",
-            ],
+            SECURITY.HEADERS.CSP_SELF,
+            'https://api.trossapp.com',
+            'https://*.auth0.com',
+          ],
         fontSrc: [SECURITY.HEADERS.CSP_SELF],
         objectSrc: [SECURITY.HEADERS.CSP_NONE],
         mediaSrc: [SECURITY.HEADERS.CSP_SELF],

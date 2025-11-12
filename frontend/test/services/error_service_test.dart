@@ -28,6 +28,30 @@ void main() {
           ErrorService.logError('');
         }, returnsNormally);
       });
+
+      test('should log errors with error object and stackTrace', () {
+        final error = Exception('Test exception');
+        final stackTrace = StackTrace.current;
+
+        expect(() {
+          ErrorService.logError(
+            'Error with stack',
+            error: error,
+            stackTrace: stackTrace,
+          );
+        }, returnsNormally);
+      });
+
+      test('should log error with all parameters', () {
+        expect(() {
+          ErrorService.logError(
+            'Complete error',
+            error: Exception('Test'),
+            stackTrace: StackTrace.current,
+            context: {'key': 'value'},
+          );
+        }, returnsNormally);
+      });
     });
 
     group('Warning Logging', () {
@@ -52,6 +76,36 @@ void main() {
         expect(() {
           ErrorService.logInfo('Info message');
         }, returnsNormally);
+      });
+
+      test('should log info with context', () {
+        expect(() {
+          ErrorService.logInfo('Info with context', context: {'key': 'value'});
+        }, returnsNormally);
+      });
+    });
+
+    group('Test Mode Detection', () {
+      test('should allow manual test mode control', () {
+        // Set manual mode
+        ErrorService.setTestMode(true);
+        expect(ErrorService.isInTestMode, isTrue);
+
+        ErrorService.setTestMode(false);
+        // After setting to false, manual mode is false
+        // (automatic detection might still be true/false depending on environment)
+        expect(() => ErrorService.isInTestMode, returnsNormally);
+      });
+
+      test('should handle test mode state changes', () {
+        // Manual control should work
+        ErrorService.setTestMode(true);
+        final state1 = ErrorService.isInTestMode;
+        expect(state1, isTrue);
+
+        ErrorService.setTestMode(false);
+        // State should reflect manual setting
+        expect(() => ErrorService.isInTestMode, returnsNormally);
       });
     });
 
@@ -92,6 +146,20 @@ void main() {
           'Some random error',
         );
         expect(message, contains('Something went wrong'));
+      });
+
+      test('should handle authentication variation', () {
+        final message = ErrorService.getUserFriendlyMessage(
+          'Authentication failed',
+        );
+        expect(message, contains('Authentication error'));
+      });
+
+      test('should handle connection variation', () {
+        final message = ErrorService.getUserFriendlyMessage(
+          'Connection refused',
+        );
+        expect(message, contains('Network connection issue'));
       });
     });
 

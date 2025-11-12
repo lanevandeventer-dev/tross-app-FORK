@@ -6,6 +6,7 @@ library;
 import 'package:flutter/material.dart';
 import '../../../config/app_spacing.dart';
 import '../../../config/app_colors.dart';
+import '../../../utils/helpers/string_helper.dart';
 
 class UserInfoHeader extends StatelessWidget {
   final String userName;
@@ -57,7 +58,7 @@ class UserInfoHeader extends StatelessWidget {
               borderRadius: spacing.radiusXS,
             ),
             child: Text(
-              userRole.toUpperCase(),
+              StringHelper.toUpperCase(userRole),
               style: theme.textTheme.labelSmall?.copyWith(
                 fontWeight: FontWeight.bold,
                 color: AppColors.brandPrimary,

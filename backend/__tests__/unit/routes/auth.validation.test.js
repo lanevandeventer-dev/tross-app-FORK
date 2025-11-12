@@ -125,7 +125,7 @@ describe("routes/auth.js - Validation & Error Handling", () => {
 
       // Assert
       expect(response.status).toBe(404);
-      expect(response.body.error).toBe("User Not Found");
+      expect(response.body.error).toBe("User not found");
       expect(response.body.message).toBe("User profile not found");
       expect(User.update).not.toHaveBeenCalled();
     });
@@ -178,8 +178,8 @@ describe("routes/auth.js - Validation & Error Handling", () => {
 
       // Assert
       expect(response.status).toBe(400);
-      expect(response.body.error).toBe("Bad Request");
-      expect(response.body.message).toBe("Refresh token required");
+      expect(response.body.error).toBe("Validation Error");
+      expect(response.body.message).toContain("Refresh token is required");
       expect(tokenService.refreshAccessToken).not.toHaveBeenCalled();
     });
 

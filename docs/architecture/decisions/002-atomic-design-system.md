@@ -1,7 +1,6 @@
 # ADR 002: Atomic Design System
 
 **Status:** ✅ Accepted  
-**Date:** October 2025  
 **Deciders:** Development Team
 
 ---

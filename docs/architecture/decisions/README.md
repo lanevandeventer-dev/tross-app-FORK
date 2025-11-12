@@ -22,5 +22,4 @@ Each ADR follows this structure:
 
 ---
 
-**Date Started:** October 27, 2025  
 **Format:** Inspired by [Michael Nygard's ADR template](https://github.com/joelparkerhenderson/architecture-decision-record)

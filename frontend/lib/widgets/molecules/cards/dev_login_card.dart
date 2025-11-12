@@ -1,31 +1,37 @@
-/// DevLoginCard - Molecule for development authentication
+/// DevLoginCard - TEMPORARY: Will be moved to organisms/ in Step 2
 ///
 /// Self-contained card with:
 /// - Header: "Developer Login" with code icon
 /// - Description: "For testing and development only"
-/// - DevLoginButtons molecule (Technician + Admin buttons)
+/// - Role dropdown: Inline replacement for RoleSelector (deleted)
+/// - Single login button
+///
+/// NOTE: This is actually an ORGANISM (has state), not a molecule
+/// Will be moved to organisms/login/dev_login_card.dart in Step 2
 ///
 /// Callbacks handle authentication logic in parent
-///
-/// Atomic Design: Molecule (uses DevLoginButtons molecule)
 library;
 
 import 'package:flutter/material.dart';
 import '../../../config/app_spacing.dart';
-import 'dev_login_buttons.dart';
+import '../../../utils/helpers/string_helper.dart';
 
-class DevLoginCard extends StatelessWidget {
-  /// Callback when technician button pressed
-  final VoidCallback onTechnicianPressed;
+// TEMPORARY: Hardcoded role list until this moves to organisms
+const _devRoles = ['admin', 'technician', 'manager', 'dispatcher', 'client'];
 
-  /// Callback when admin button pressed
-  final VoidCallback onAdminPressed;
+class DevLoginCard extends StatefulWidget {
+  /// Callback when dev login button pressed with selected role
+  final void Function(String role) onDevLogin;
 
-  const DevLoginCard({
-    super.key,
-    required this.onTechnicianPressed,
-    required this.onAdminPressed,
-  });
+  const DevLoginCard({super.key, required this.onDevLogin});
+
+  @override
+  State<DevLoginCard> createState() => _DevLoginCardState();
+}
+
+class _DevLoginCardState extends State<DevLoginCard> {
+  /// Currently selected role (defaults to admin - highest priority)
+  String? _selectedRole = 'admin';
 
   @override
   Widget build(BuildContext context) {
@@ -63,10 +69,42 @@ class DevLoginCard extends StatelessWidget {
             ),
             spacing.gapLG,
 
-            // Dev Login Buttons
-            DevLoginButtons(
-              onTechnicianPressed: onTechnicianPressed,
-              onAdminPressed: onAdminPressed,
+            // TEMPORARY: Inline role dropdown (replaces deleted RoleSelector)
+            // Will use SelectInput<String> when moved to organisms in Step 2
+            DropdownButtonFormField<String>(
+              initialValue: _selectedRole,
+              decoration: const InputDecoration(
+                labelText: 'Select Role',
+                helperText: 'Choose a role to test with',
+                border: OutlineInputBorder(),
+              ),
+              items: _devRoles.map((role) {
+                return DropdownMenuItem(
+                  value: role,
+                  child: Text(StringHelper.capitalize(role)),
+                );
+              }).toList(),
+              onChanged: (role) => setState(() => _selectedRole = role),
+            ),
+
+            spacing.gapMD,
+
+            // Single Dev Login Button
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _selectedRole != null
+                    ? () => widget.onDevLogin(_selectedRole!)
+                    : null,
+                icon: const Icon(Icons.login),
+                label: const Text('Dev Login'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
+                ),
+              ),
             ),
           ],
         ),

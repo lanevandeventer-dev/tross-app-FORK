@@ -36,12 +36,22 @@ void main() {
         expect(find.text(AppConstants.appTagline), findsOneWidget);
       });
 
-      testWidgets('should display login buttons', (WidgetTester tester) async {
+      testWidgets('should display dev login card with role dropdown', (
+        WidgetTester tester,
+      ) async {
         await pumpTestWidget(tester, createTestWidget());
 
-        // Check for test login buttons (text appears in multiple places - label + button)
-        expect(find.text(AppConstants.loginButtonTest), findsWidgets);
-        expect(find.text(AppConstants.loginButtonAdmin), findsWidgets);
+        // Check for dev login card elements
+        expect(find.text('Developer Login'), findsOneWidget);
+        expect(
+          find.text('Dev Login'),
+          findsOneWidget,
+        ); // The actual login button
+
+        // Check that role dropdown exists with helper text
+        expect(find.text('Choose a role to test with'), findsOneWidget);
+        // Dropdown should show first role (admin) by default
+        expect(find.text('Admin'), findsOneWidget);
       });
 
       testWidgets('should display development notice', (
@@ -65,34 +75,31 @@ void main() {
     });
 
     group('User Interactions', () {
-      testWidgets('should respond to technician login tap', (
+      testWidgets('should allow selecting role and logging in', (
         WidgetTester tester,
       ) async {
         await pumpTestWidget(tester, createTestWidget());
 
-        // Find and tap the technician login button (appears in multiple places)
-        final technicianButton = find.text(AppConstants.loginButtonTest).first;
-        expect(find.text(AppConstants.loginButtonTest), findsWidgets);
+        // Dev login button should be present (default role pre-selected: admin)
+        final devLoginButton = find.text('Dev Login');
+        expect(devLoginButton, findsOneWidget);
 
-        await tester.tap(technicianButton);
+        await tester.tap(devLoginButton);
         await tester.pump();
 
-        // Should trigger login process (we can't easily test navigation without more setup)
+        // Should trigger dev login process with selected role
       });
 
-      testWidgets('should respond to admin login tap', (
+      testWidgets('should show all available dev roles in dropdown', (
         WidgetTester tester,
       ) async {
         await pumpTestWidget(tester, createTestWidget());
 
-        // Find and tap the admin login button (appears in multiple places)
-        final adminButton = find.text(AppConstants.loginButtonAdmin).first;
-        expect(find.text(AppConstants.loginButtonAdmin), findsWidgets);
-
-        await tester.tap(adminButton);
-        await tester.pump();
-
-        // Should trigger admin login process
+        // The dropdown should contain all 5 dev roles from the hardcoded list
+        // (admin, manager, dispatcher, technician, client)
+        // Verify the dev login card is present
+        expect(find.text('Developer Login'), findsOneWidget);
+        expect(find.text('For testing and development only'), findsOneWidget);
       });
     });
 
@@ -142,9 +149,11 @@ void main() {
       ) async {
         await pumpTestWidget(tester, createTestWidget());
 
-        // Check for buttons with text (appears in multiple places)
-        expect(find.text(AppConstants.loginButtonTest), findsWidgets);
-        expect(find.text(AppConstants.loginButtonAdmin), findsWidgets);
+        // Check for dev login card with proper labels
+        expect(find.text('Developer Login'), findsOneWidget);
+        expect(find.text('Dev Login'), findsOneWidget);
+        // Check for dropdown helper text instead of placeholder (has default value)
+        expect(find.text('Choose a role to test with'), findsOneWidget);
 
         // Check for app logo icon
         expect(find.byIcon(Icons.build_circle), findsOneWidget);

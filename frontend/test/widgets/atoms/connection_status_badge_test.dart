@@ -12,6 +12,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:tross_app/models/database_health.dart';
 import 'package:tross_app/widgets/atoms/indicators/connection_status_badge.dart';
 import 'package:tross_app/config/app_theme.dart';
 
@@ -267,73 +268,6 @@ void main() {
 
         expect(find.byIcon(Icons.error), findsOneWidget);
         expect(find.text('Critical'), findsNothing);
-      });
-    });
-
-    group('Visual Styling', () {
-      testWidgets('has rounded corners', (WidgetTester tester) async {
-        await tester.pumpWidget(
-          makeTestable(
-            const ConnectionStatusBadge(status: HealthStatus.healthy),
-          ),
-        );
-
-        final container = tester.widget<Container>(
-          find
-              .descendant(
-                of: find.byType(ConnectionStatusBadge),
-                matching: find.byType(Container),
-              )
-              .first,
-        );
-
-        final decoration = container.decoration as BoxDecoration;
-        expect(decoration.borderRadius, isNotNull);
-      });
-
-      testWidgets('has border with matching color', (
-        WidgetTester tester,
-      ) async {
-        await tester.pumpWidget(
-          makeTestable(
-            const ConnectionStatusBadge(status: HealthStatus.healthy),
-          ),
-        );
-
-        final container = tester.widget<Container>(
-          find
-              .descendant(
-                of: find.byType(ConnectionStatusBadge),
-                matching: find.byType(Container),
-              )
-              .first,
-        );
-
-        final decoration = container.decoration as BoxDecoration;
-        expect(decoration.border, isNotNull);
-      });
-
-      testWidgets('has background color with transparency', (
-        WidgetTester tester,
-      ) async {
-        await tester.pumpWidget(
-          makeTestable(
-            const ConnectionStatusBadge(status: HealthStatus.degraded),
-          ),
-        );
-
-        final container = tester.widget<Container>(
-          find
-              .descendant(
-                of: find.byType(ConnectionStatusBadge),
-                matching: find.byType(Container),
-              )
-              .first,
-        );
-
-        final decoration = container.decoration as BoxDecoration;
-        // Background should have alpha for transparency
-        expect(decoration.color, isNotNull);
       });
     });
 

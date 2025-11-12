@@ -102,4 +102,60 @@ class DateTimeHelpers {
       return '${duration.inSeconds} ${duration.inSeconds == 1 ? 'second' : 'seconds'}';
     }
   }
+
+  /// Formats a [DateTime] as user-friendly date string.
+  ///
+  /// Returns formatted string "MMM d, yyyy" (e.g., "Jan 15, 2024").
+  /// No external dependencies - pure Dart implementation.
+  ///
+  /// Example:
+  /// ```dart
+  /// final date = DateTime(2024, 1, 15);
+  /// print(DateTimeHelpers.formatDate(date)); // "Jan 15, 2024"
+  /// ```
+  static String formatDate(DateTime date) {
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return '${months[date.month - 1]} ${date.day}, ${date.year}';
+  }
+
+  /// Formats a [DateTime] as contextual timestamp.
+  ///
+  /// Returns human-readable strings based on recency:
+  /// - "Today HH:MM" - same day
+  /// - "Yesterday" - previous day
+  /// - "N days ago" - within last week
+  /// - "YYYY-MM-DD" - older than a week
+  ///
+  /// Example:
+  /// ```dart
+  /// final recent = DateTime.now().subtract(Duration(hours: 2));
+  /// print(DateTimeHelpers.formatTimestamp(recent)); // "Today 14:30"
+  /// ```
+  static String formatTimestamp(DateTime dt) {
+    final now = DateTime.now();
+    final diff = now.difference(dt);
+
+    if (diff.inDays == 0) {
+      return 'Today ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    } else if (diff.inDays == 1) {
+      return 'Yesterday';
+    } else if (diff.inDays < 7) {
+      return '${diff.inDays} days ago';
+    } else {
+      return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+    }
+  }
 }

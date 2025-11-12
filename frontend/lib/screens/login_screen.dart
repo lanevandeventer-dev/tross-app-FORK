@@ -3,7 +3,7 @@
 /// Composition:
 /// - LoginHeader molecule (branding)
 /// - ProductionLoginCard molecule (Auth0)
-/// - DevLoginCard molecule (dev auth, conditional)
+/// - DevLoginCard organism (dev auth with role state, conditional)
 /// - ConnectionStatusBadge atom (backend health)
 /// - AppFooter molecule (copyright)
 ///
@@ -18,10 +18,11 @@ import '../config/app_config.dart';
 import '../config/constants.dart';
 import '../config/app_spacing.dart';
 import '../services/error_service.dart';
-import '../utils/helpers/ui_helpers.dart';
+import '../services/notification_service.dart';
+import '../services/role_service.dart';
 import '../widgets/molecules/login_header.dart';
 import '../widgets/molecules/cards/production_login_card.dart';
-import '../widgets/molecules/cards/dev_login_card.dart';
+import '../widgets/organisms/login/dev_login_card.dart';
 import '../widgets/atoms/atoms.dart';
 
 class LoginScreen extends StatelessWidget {
@@ -64,11 +65,14 @@ class LoginScreen extends StatelessWidget {
                           // Dev authentication (conditional)
                           if (AppConfig.isDevMode) ...[
                             spacing.gapXL,
+                            // Use hardcoded dev roles (no auth required)
+                            // Matches backend test-users.js roles
                             DevLoginCard(
-                              onTechnicianPressed: () =>
-                                  _handleDevLogin(context, isAdmin: false),
-                              onAdminPressed: () =>
-                                  _handleDevLogin(context, isAdmin: true),
+                              availableRoles: RoleService.getAllForDevMode()
+                                  .map((role) => role.name)
+                                  .toList(),
+                              onDevLogin: (role) =>
+                                  _handleDevLogin(context, role: role),
                             ),
                           ],
 
@@ -99,26 +103,26 @@ class LoginScreen extends StatelessWidget {
     );
   }
 
-  /// Handle dev authentication (technician or admin)
+  /// Handle dev authentication (any role)
   Future<void> _handleDevLogin(
     BuildContext context, {
-    required bool isAdmin,
+    required String role,
   }) async {
     if (!context.mounted) return;
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-    ErrorService.logInfo('Starting dev login', context: {'isAdmin': isAdmin});
+    ErrorService.logInfo('Starting dev login', context: {'role': role});
 
     try {
-      final success = await authProvider.loginWithTestToken(isAdmin: isAdmin);
+      final success = await authProvider.loginWithTestToken(role: role);
 
       ErrorService.logInfo(
         'Dev login result',
         context: {
           'success': success,
           'isAuthenticated': authProvider.isAuthenticated,
-          'isAdmin': isAdmin,
+          'role': role,
         },
       );
 
@@ -133,24 +137,21 @@ class LoginScreen extends StatelessWidget {
       } else {
         ErrorService.logWarning(
           '[Expected in tests] Login failed - showing error to user',
-          context: {'isAdmin': isAdmin},
+          context: {'role': role},
         );
-        UiHelpers.showErrorSnackBar(
+        NotificationService.showError(
           context,
-          isAdmin
-              ? AppConstants.adminLoginFailed
-              : AppConstants.technicianLoginFailed,
+          'Dev login failed for role: $role',
         );
       }
     } catch (e) {
       ErrorService.logError(
         'Login exception',
         error: e,
-        context: {'isAdmin': isAdmin},
+        context: {'role': role},
       );
       if (context.mounted) {
-        final role = isAdmin ? 'Admin' : 'Technician';
-        UiHelpers.showErrorSnackBar(context, '$role login failed: $e');
+        NotificationService.showError(context, 'Dev login failed: $e');
       }
     }
   }

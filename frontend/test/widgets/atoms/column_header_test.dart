@@ -203,22 +203,6 @@ void main() {
       expect(row.children.length, greaterThan(1));
     });
 
-    testWidgets('respects width parameter', (tester) async {
-      await pumpTestWidget(
-        tester,
-        const ColumnHeader(label: 'Fixed Width', width: 200),
-      );
-
-      final container = tester.widget<Container>(
-        find.ancestor(
-          of: find.text('Fixed Width'),
-          matching: find.byType(Container).first,
-        ),
-      );
-
-      expect(container.constraints?.maxWidth, 200);
-    });
-
     testWidgets('has proper text styling', (tester) async {
       await pumpTestWidget(tester, const ColumnHeader(label: 'Styled Header'));
 

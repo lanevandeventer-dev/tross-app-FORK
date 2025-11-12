@@ -9,7 +9,6 @@ library;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tross_app/models/database_health.dart';
-import 'package:tross_app/widgets/atoms/indicators/connection_status_badge.dart';
 
 void main() {
   group('DatabaseHealth Model', () {

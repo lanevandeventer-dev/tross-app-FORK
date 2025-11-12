@@ -8,13 +8,27 @@ jest.mock("../../../db/models/User");
 jest.mock("../../../db/models/Role");
 jest.mock("../../../services/audit-service");
 jest.mock("../../../utils/request-helpers");
-jest.mock("../../../middleware/auth");
+jest.mock("../../../middleware/auth", () => ({
+  authenticateToken: jest.fn((req, res, next) => next()),
+  requirePermission: jest.fn(() => (req, res, next) => next()),
+  requireMinimumRole: jest.fn(() => (req, res, next) => next()),
+}));
 
 // Mock validators with proper factory functions that return middleware
 jest.mock("../../../validators", () => ({
   validatePagination: jest.fn(() => (req, res, next) => {
     if (!req.validated) req.validated = {};
     req.validated.pagination = { page: 1, limit: 50, offset: 0 };
+    next();
+  }),
+  validateQuery: jest.fn(() => (req, res, next) => {
+    // Mock metadata-driven query validation
+    if (!req.validated) req.validated = {};
+    if (!req.validated.query) req.validated.query = {};
+    req.validated.query.search = req.query.search;
+    req.validated.query.filters = req.query.filters || {};
+    req.validated.query.sortBy = req.query.sortBy;
+    req.validated.query.sortOrder = req.query.sortOrder;
     next();
   }),
   validateIdParam: jest.fn((req, res, next) => {
@@ -48,7 +62,7 @@ const usersRouter = require("../../../routes/users");
 const User = require("../../../db/models/User");
 const auditService = require("../../../services/audit-service");
 const { getClientIp, getUserAgent } = require("../../../utils/request-helpers");
-const { authenticateToken, requireAdmin } = require("../../../middleware/auth");
+const { authenticateToken, requirePermission } = require("../../../middleware/auth");
 const {
   validateUserCreate,
   validateProfileUpdate,
@@ -67,10 +81,10 @@ describe("Users Routes - CRUD Operations", () => {
     getClientIp.mockReturnValue("127.0.0.1");
     getUserAgent.mockReturnValue("Jest Test Agent");
     authenticateToken.mockImplementation((req, res, next) => {
-      req.dbUser = { id: 1, email: "admin@example.com", role_name: "admin" };
+      req.dbUser = { id: 1, email: "admin@example.com", role: "admin" };
       next();
     });
-    requireAdmin.mockImplementation((req, res, next) => next());
+    requirePermission.mockImplementation(() => (req, res, next) => next());
     validateIdParam.mockImplementation((req, res, next) => {
       req.validatedId = parseInt(req.params.id);
       next();
@@ -97,7 +111,18 @@ describe("Users Routes - CRUD Operations", () => {
           is_active: true,
         },
       ];
-      User.getAll.mockResolvedValue(mockUsers);
+      // Mock findAll() to return paginated response
+      User.findAll.mockResolvedValue({
+        data: mockUsers,
+        pagination: {
+          page: 1,
+          limit: 50,
+          total: 2,
+          totalPages: 1,
+          hasNext: false,
+          hasPrev: false,
+        },
+      });
 
       const response = await request(app).get("/api/users");
 
@@ -105,11 +130,13 @@ describe("Users Routes - CRUD Operations", () => {
       expect(response.body.success).toBe(true);
       expect(response.body.data).toEqual(mockUsers);
       expect(response.body.count).toBe(2);
-      expect(User.getAll).toHaveBeenCalledTimes(1);
+      expect(response.body.pagination).toBeDefined();
+      expect(response.body.pagination.total).toBe(2);
+      expect(User.findAll).toHaveBeenCalledTimes(1);
     });
 
     it("should handle database errors gracefully", async () => {
-      User.getAll.mockRejectedValue(new Error("Database connection failed"));
+      User.findAll.mockRejectedValue(new Error("Database connection failed"));
 
       const response = await request(app).get("/api/users");
 
@@ -118,7 +145,17 @@ describe("Users Routes - CRUD Operations", () => {
     });
 
     it("should return empty array when no users exist", async () => {
-      User.getAll.mockResolvedValue([]);
+      User.findAll.mockResolvedValue({
+        data: [],
+        pagination: {
+          page: 1,
+          limit: 50,
+          total: 0,
+          totalPages: 1,
+          hasNext: false,
+          hasPrev: false,
+        },
+      });
 
       const response = await request(app).get("/api/users");
 
@@ -329,13 +366,13 @@ describe("Users Routes - CRUD Operations", () => {
       const mockUser = { id: 2, email: "user@example.com", is_active: true };
 
       User.findById.mockResolvedValue(mockUser);
-      User.delete.mockResolvedValue(true);
+      User.delete.mockResolvedValue(mockUser);
       auditService.log.mockResolvedValue(true);
 
       const response = await request(app).delete("/api/users/2");
 
       expect(response.status).toBe(HTTP_STATUS.OK);
-      expect(User.delete).toHaveBeenCalledWith(2, false); // Soft delete
+      expect(User.delete).toHaveBeenCalledWith(2); // DELETE = permanent removal
     });
 
     it("should prevent self-deletion", async () => {
@@ -362,16 +399,6 @@ describe("Users Routes - CRUD Operations", () => {
       const response = await request(app).delete("/api/users/2");
 
       expect(response.status).toBe(HTTP_STATUS.INTERNAL_SERVER_ERROR);
-    });
-
-    it("should perform soft delete (not hard delete)", async () => {
-      User.findById.mockResolvedValue({ id: 2 });
-      User.delete.mockResolvedValue(true);
-      auditService.log.mockResolvedValue(true);
-
-      await request(app).delete("/api/users/2");
-
-      expect(User.delete).toHaveBeenCalledWith(2, false);
     });
   });
 });

@@ -1,7 +1,10 @@
 // Robust User model with error handling and validation
-const db = require("../connection");
-const { logger } = require("../../config/logger");
-const { toSafeInteger } = require("../../validators/type-coercion");
+const db = require('../connection');
+const { logger } = require('../../config/logger');
+const { toSafeInteger } = require('../../validators/type-coercion');
+const PaginationService = require('../../services/pagination-service');
+const QueryBuilderService = require('../../services/query-builder-service');
+const userMetadata = require('../../config/models/user-metadata');
 
 class User {
   // ============================================================================
@@ -17,7 +20,7 @@ class User {
    * @param {string} orderBy - ORDER BY clause (optional)
    * @returns {string} SQL query
    */
-  static _buildUserWithRoleQuery(whereClause = "", orderBy = "") {
+  static _buildUserWithRoleQuery(whereClause = '', orderBy = '') {
     return `
       SELECT u.*, r.name as role, u.role_id
       FROM users u 
@@ -25,6 +28,52 @@ class User {
       ${whereClause}
       ${orderBy}
     `.trim();
+  }
+
+  /**
+   * Validate user data contextually
+   * Handles nullable auth0_id for legitimate cases:
+   *  - Dev mode: synthetic IDs generated
+   *  - Pending activation: awaiting first login
+   *
+   * @private
+   * @param {Object} user - User data
+   * @param {Object} context - Validation context
+   * @param {boolean} context.isDev - Is development environment
+   * @param {boolean} context.isApiResponse - Is being returned to API client
+   * @returns {Object} Validated/enriched user data
+   */
+  static _validateUserData(user, context = {}) {
+    const isDev = process.env.NODE_ENV === 'development' || context.isDev;
+    const status = user.status || 'active';
+
+    // If no auth0_id, handle contextually
+    if (!user.auth0_id) {
+      // Dev mode: provide synthetic ID for consistency
+      if (isDev && context.isApiResponse) {
+        return {
+          ...user,
+          auth0_id: `dev-user-${user.id}`,
+          _synthetic: true, // Flag for client awareness
+        };
+      }
+
+      // Pending activation: OK for now
+      if (status === 'pending_activation') {
+        return user; // Valid state - awaiting first login
+      }
+
+      // Active user without auth0_id is data integrity issue
+      if (status === 'active') {
+        logger.warn('Data integrity issue: Active user missing auth0_id', {
+          userId: user.id,
+          email: user.email,
+        });
+        // Don't throw - log and continue (defensive)
+      }
+    }
+
+    return user;
   }
 
   // ============================================================================
@@ -40,19 +89,22 @@ class User {
    */
   static async findByAuth0Id(auth0Id) {
     if (!auth0Id) {
-      throw new Error("Auth0 ID is required");
+      throw new Error('Auth0 ID is required');
     }
 
     try {
-      const query = this._buildUserWithRoleQuery("WHERE u.auth0_id = $1");
+      const query = this._buildUserWithRoleQuery('WHERE u.auth0_id = $1');
       const result = await db.query(query, [auth0Id]);
-      return result.rows[0] || null;
+      const user = result.rows[0] || null;
+
+      // Validate and enrich user data before returning
+      return user ? this._validateUserData(user, { isApiResponse: false }) : null;
     } catch (error) {
-      logger.error("Error finding user by Auth0 ID", {
+      logger.error('Error finding user by Auth0 ID', {
         error: error.message,
         auth0Id,
       });
-      throw new Error("Failed to find user");
+      throw new Error('Failed to find user');
     }
   }
 
@@ -68,18 +120,21 @@ class User {
    */
   static async findById(id) {
     // TYPE SAFETY: Ensure id is a valid positive integer
-    const safeId = toSafeInteger(id, "userId", { min: 1, allowNull: false });
+    const safeId = toSafeInteger(id, 'userId', { min: 1, allowNull: false });
 
     try {
-      const query = this._buildUserWithRoleQuery("WHERE u.id = $1");
+      const query = this._buildUserWithRoleQuery('WHERE u.id = $1');
       const result = await db.query(query, [safeId]);
-      return result.rows[0] || null;
+      const user = result.rows[0] || null;
+
+      // Validate and enrich user data before returning
+      return user ? this._validateUserData(user, { isApiResponse: false }) : null;
     } catch (error) {
-      logger.error("Error finding user by ID", {
+      logger.error('Error finding user by ID', {
         error: error.message,
         userId: id,
       });
-      throw new Error("Failed to find user");
+      throw new Error('Failed to find user');
     }
   }
 
@@ -99,12 +154,12 @@ class User {
     const { sub: auth0_id, email, given_name, family_name, role } = auth0Data;
 
     if (!auth0_id || !email) {
-      throw new Error("Auth0 ID and email are required");
+      throw new Error('Auth0 ID and email are required');
     }
 
     try {
       // Assign role from JWT token or default to 'client'
-      const userRole = role || "client";
+      const userRole = role || 'client';
 
       // Single INSERT with role_id - no transaction needed (KISS)
       const userQuery = `
@@ -115,26 +170,26 @@ class User {
       const userResult = await db.query(userQuery, [
         auth0_id,
         email,
-        given_name || "",
-        family_name || "",
+        given_name || '',
+        family_name || '',
         userRole,
       ]);
 
       return userResult.rows[0];
     } catch (error) {
-      logger.error("Error creating user from Auth0", {
+      logger.error('Error creating user from Auth0', {
         error: error.message,
         email,
       });
 
-      if (error.constraint === "users_auth0_id_key") {
-        throw new Error("User already exists");
+      if (error.constraint === 'users_auth0_id_key') {
+        throw new Error('User already exists');
       }
-      if (error.constraint === "users_email_key") {
-        throw new Error("Email already exists");
+      if (error.constraint === 'users_email_key') {
+        throw new Error('Email already exists');
       }
 
-      throw new Error("Failed to create user");
+      throw new Error('Failed to create user');
     }
   }
 
@@ -142,7 +197,7 @@ class User {
   // Handles account linking: if user exists by email but different auth0_id, links them
   static async findOrCreate(auth0Data) {
     if (!auth0Data?.sub) {
-      throw new Error("Invalid Auth0 data");
+      throw new Error('Invalid Auth0 data');
     }
 
     try {
@@ -152,13 +207,13 @@ class User {
       if (!user && auth0Data.email) {
         // Check if user exists by email (might have been created manually or with different Auth0 connection)
         const emailCheckQuery =
-          "SELECT id FROM users WHERE email = $1 AND is_active = true";
+          'SELECT id FROM users WHERE email = $1 AND is_active = true';
         const emailResult = await db.query(emailCheckQuery, [auth0Data.email]);
 
         if (emailResult.rows.length > 0) {
           // User exists with this email - update their auth0_id to link accounts
           await db.query(
-            "UPDATE users SET auth0_id = $1, updated_at = CURRENT_TIMESTAMP WHERE email = $2",
+            'UPDATE users SET auth0_id = $1, updated_at = CURRENT_TIMESTAMP WHERE email = $2',
             [auth0Data.sub, auth0Data.email],
           );
 
@@ -176,7 +231,7 @@ class User {
 
       return user;
     } catch (error) {
-      logger.error("Error in findOrCreate", {
+      logger.error('Error in findOrCreate', {
         error: error.message,
         auth0Id: auth0Data?.sub,
       });
@@ -188,60 +243,167 @@ class User {
   // Create new user (manual creation)
   // KISS: Direct role_id foreign key (many-to-one relationship)
   static async create(userData) {
-    const { email, first_name, last_name, role_id } = userData;
+    const { email, first_name, last_name, role_id, auth0_id } = userData;
 
-    if (!email) {
-      throw new Error("Email is required");
+    // Sanitize empty strings to trigger proper validation
+    const sanitizedEmail = email?.trim() || null;
+
+    if (!sanitizedEmail) {
+      throw new Error('Email is required');
     }
 
     try {
       // Assign role if provided, otherwise use client role
       let assignedRoleId = role_id;
       if (!assignedRoleId) {
-        const Role = require("./Role");
-        const clientRole = await Role.getByName("client");
+        const Role = require('./Role');
+        const clientRole = await Role.getByName('client');
         assignedRoleId = clientRole.id;
       }
 
-      // Single INSERT with role_id - no transaction needed (KISS)
+      // Determine initial status:
+      // - If auth0_id provided (from Auth0 SSO): active immediately
+      // - If no auth0_id (manual creation by admin): pending_activation
+      const status = auth0_id ? 'active' : 'pending_activation';
+
+      // Single INSERT with role_id and status - no transaction needed (KISS)
       const userQuery = `
-        INSERT INTO users (email, first_name, last_name, role_id) 
-        VALUES ($1, $2, $3, $4) 
+        INSERT INTO users (email, first_name, last_name, role_id, auth0_id, status) 
+        VALUES ($1, $2, $3, $4, $5, $6) 
         RETURNING *
       `;
       const userResult = await db.query(userQuery, [
-        email,
-        first_name || "",
-        last_name || "",
+        sanitizedEmail,
+        first_name || '',
+        last_name || '',
         assignedRoleId,
+        auth0_id || null,
+        status,
       ]);
 
       // Return user with role
       return await this.findById(userResult.rows[0].id);
     } catch (error) {
-      logger.error("Error creating user", { error: error.message, email });
+      logger.error('Error creating user', { error: error.message, email });
 
-      if (error.constraint === "users_email_key") {
-        throw new Error("Email already exists");
+      if (error.constraint === 'users_email_key') {
+        throw new Error('Email already exists');
       }
 
-      throw new Error("Failed to create user");
+      throw new Error('Failed to create user');
     }
   }
 
-  // Get all users with roles (admin function)
-  // KISS: Direct JOIN with users.role_id (many-to-one relationship)
-  static async getAll() {
+  /**
+   * Find all users with pagination, search, filters, and sorting
+   * Contract v2.0: Metadata-driven query building (ZERO hardcoding!)
+   *
+   * SRP: Uses PaginationService for pagination + QueryBuilderService for queries
+   * KISS: Direct JOIN with users.role_id (many-to-one relationship)
+   *
+   * @param {Object} options - Query options
+   * @param {number} [options.page=1] - Page number (1-indexed)
+   * @param {number} [options.limit=50] - Items per page (max: 200)
+   * @param {boolean} [options.includeInactive=false] - Include inactive users
+   * @param {string} [options.search] - Search term (searches across searchable fields)
+   * @param {Object} [options.filters] - Filters (e.g., { role_id: 2, is_active: true })
+   * @param {string} [options.sortBy] - Field to sort by (validated against metadata)
+   * @param {string} [options.sortOrder] - 'ASC' or 'DESC'
+   * @returns {Promise<Object>} { data: User[], pagination: {...}, appliedFilters: {...} }
+   */
+  static async findAll(options = {}) {
     try {
-      const query = this._buildUserWithRoleQuery(
-        "",
-        "ORDER BY u.created_at DESC",
+      // SRP: Delegate pagination validation to centralized service
+      const { page, limit, offset } = PaginationService.validateParams(options);
+      const includeInactive = options.includeInactive || false;
+
+      // Build query using metadata-driven approach
+      const { searchableFields, filterableFields, sortableFields, defaultSort } = userMetadata;
+
+      // Build search clause (case-insensitive ILIKE across all searchable fields)
+      const search = QueryBuilderService.buildSearchClause(
+        options.search,
+        searchableFields,
       );
-      const result = await db.query(query);
-      return result.rows;
+
+      // Build filter clause (generic key-value filters with operator support)
+      const filterOptions = { ...options.filters };
+
+      const filters = QueryBuilderService.buildFilterClause(
+        filterOptions,
+        filterableFields,
+        search ? search.paramOffset : 0, // Offset params if search clause exists
+      );
+
+      // Combine WHERE clauses (including explicit u.is_active to avoid ambiguity with roles.is_active)
+      const whereClauses = [search?.clause, filters?.clause].filter(Boolean);
+
+      // Add is_active filter with table alias to avoid ambiguity (both users and roles have is_active)
+      if (!includeInactive) {
+        const isActiveParamIndex = (search?.paramOffset || 0) + (filters?.paramOffset || 0) + 1;
+        whereClauses.push(`u.is_active = $${isActiveParamIndex}`);
+      }
+
+      const whereClause = whereClauses.length > 0
+        ? `WHERE ${whereClauses.join(' AND ')}`
+        : '';
+
+      // Combine parameters
+      const params = [
+        ...(search?.params || []),
+        ...(filters?.params || []),
+      ];
+
+      // Add is_active parameter if filtering for active users
+      if (!includeInactive) {
+        params.push(true);
+      }
+
+      // Build sort clause (validated against sortableFields)
+      const sortClause = QueryBuilderService.buildSortClause(
+        options.sortBy,
+        options.sortOrder,
+        sortableFields,
+        defaultSort,
+      );
+
+      // Get total count for pagination metadata
+      const countQuery = `
+        SELECT COUNT(*) as total
+        FROM users u
+        ${whereClause}
+      `;
+      const countResult = await db.query(countQuery, params);
+      const total = parseInt(countResult.rows[0].total);
+
+      // Get paginated users with role data
+      const query = this._buildUserWithRoleQuery(
+        whereClause,
+        `ORDER BY u.${sortClause} LIMIT ${limit} OFFSET ${offset}`,
+      );
+      const result = await db.query(query, params);
+
+      // Apply validation to all users in the result set
+      const validatedUsers = result.rows.map(user =>
+        this._validateUserData(user, { isApiResponse: true }),
+      );
+
+      // SRP: Delegate metadata generation to centralized service
+      const metadata = PaginationService.generateMetadata(page, limit, total);
+
+      return {
+        data: validatedUsers,
+        pagination: metadata,
+        appliedFilters: {
+          search: options.search || null,
+          filters: filterOptions,
+          sortBy: options.sortBy || defaultSort.field,
+          sortOrder: options.sortOrder || defaultSort.order,
+        },
+      };
     } catch (error) {
-      logger.error("Error getting all users", { error: error.message });
-      throw new Error("Failed to retrieve users");
+      logger.error('Error finding all users', { error: error.message });
+      throw new Error('Failed to retrieve users');
     }
   }
 
@@ -256,18 +418,26 @@ class User {
    * @param {string} [updates.first_name] - User first name
    * @param {string} [updates.last_name] - User last name
    * @param {boolean} [updates.is_active] - User active status
+   * Contract v2.0: Generic update with optional audit context
+   *
+   * @param {number|string} id - User ID (will be coerced to integer)
+   * @param {Object} updates - Fields to update
+   * @param {Object} context - Optional context for audit logging
+   * @param {number} context.userId - ID of user performing the update
+   * @param {string} context.ipAddress - IP address of request
+   * @param {string} context.userAgent - User agent of request
    * @returns {Promise<Object>} Updated user object
    * @throws {Error} If id is invalid or no valid fields to update
    */
-  static async update(id, updates) {
+  static async update(id, updates, context = null) {
     // TYPE SAFETY: Ensure id is a valid positive integer
-    const safeId = toSafeInteger(id, "userId", { min: 1, allowNull: false });
+    const safeId = toSafeInteger(id, 'userId', { min: 1, allowNull: false });
 
-    if (!updates || typeof updates !== "object") {
-      throw new Error("Valid user ID and updates are required");
+    if (!updates || typeof updates !== 'object') {
+      throw new Error('Valid user ID and updates are required');
     }
 
-    const allowedFields = ["email", "first_name", "last_name", "is_active"];
+    const allowedFields = ['email', 'first_name', 'last_name', 'is_active'];
     const validUpdates = {};
 
     // Filter only allowed fields
@@ -278,8 +448,11 @@ class User {
     });
 
     if (Object.keys(validUpdates).length === 0) {
-      throw new Error("No valid fields to update");
+      throw new Error('No valid fields to update');
     }
+
+    // Contract v2.0: No audit fields on entity
+    // Audit logging happens via AuditService (handled by caller)
 
     try {
       const fields = [];
@@ -296,7 +469,7 @@ class User {
 
       const query = `
         UPDATE users 
-        SET ${fields.join(", ")}, updated_at = CURRENT_TIMESTAMP 
+        SET ${fields.join(', ')}, updated_at = CURRENT_TIMESTAMP 
         WHERE id = $${paramCount} 
         RETURNING *
       `;
@@ -304,18 +477,49 @@ class User {
       const result = await db.query(query, values);
 
       if (result.rows.length === 0) {
-        throw new Error("User not found");
+        throw new Error('User not found');
       }
 
-      return result.rows[0];
+      // Fetch full user with role name via JOIN
+      const updatedUser = await this.findById(safeId);
+
+      if (!updatedUser) {
+        throw new Error('User not found after update');
+      }
+
+      // Contract v2.0: Log is_active changes to audit_logs
+      if ('is_active' in validUpdates && context) {
+        const auditService = require('../../services/audit-service');
+        const action = validUpdates.is_active === false ? 'deactivate' : 'reactivate';
+
+        if (action === 'deactivate') {
+          await auditService.logDeactivation(
+            'users',
+            safeId,
+            context.userId,
+            context.ipAddress,
+            context.userAgent,
+          );
+        } else {
+          await auditService.logReactivation(
+            'users',
+            safeId,
+            context.userId,
+            context.ipAddress,
+            context.userAgent,
+          );
+        }
+      }
+
+      return updatedUser;
     } catch (error) {
-      logger.error("Error updating user", { error: error.message, userId: id });
+      logger.error('Error updating user', { error: error.message, userId: id });
 
-      if (error.constraint === "users_email_key") {
-        throw new Error("Email already exists");
+      if (error.constraint === 'users_email_key') {
+        throw new Error('Email already exists');
       }
 
-      throw new Error("Failed to update user");
+      throw new Error('Failed to update user');
     }
   }
 
@@ -332,11 +536,11 @@ class User {
    */
   static async setRole(userId, roleId) {
     // TYPE SAFETY: Ensure both IDs are valid positive integers
-    const safeUserId = toSafeInteger(userId, "userId", {
+    const safeUserId = toSafeInteger(userId, 'userId', {
       min: 1,
       allowNull: false,
     });
-    const safeRoleId = toSafeInteger(roleId, "roleId", {
+    const safeRoleId = toSafeInteger(roleId, 'roleId', {
       min: 1,
       allowNull: false,
     });
@@ -351,13 +555,13 @@ class User {
       const result = await db.query(query, [safeRoleId, safeUserId]);
 
       if (result.rows.length === 0) {
-        throw new Error("User not found");
+        throw new Error('User not found');
       }
 
       // Return updated user with role
       return await this.findById(userId);
     } catch (error) {
-      logger.error("Error setting user role", {
+      logger.error('Error setting user role', {
         error: error.message,
         userId,
         roleId,
@@ -374,47 +578,92 @@ class User {
    *
    * @param {number|string} id - User ID (will be coerced to integer)
    * @param {boolean} [hardDelete=false] - True for permanent deletion, false for soft delete
+   * Contract v2.0: Generic delete (soft by default, hard optional)
+   * Soft delete just calls update({ is_active: false })
+   *
+   * @param {number|string} id - User ID (will be coerced to integer)
+   * @param {boolean} [hardDelete=false] - True for permanent deletion, false for soft delete
+   * @param {Object} context - Optional context for audit logging
    * @returns {Promise<Object>} Deleted/deactivated user object
    * @throws {Error} If id is invalid or user not found
    */
-  static async delete(id, hardDelete = false) {
+  /**
+   * Delete user permanently from database
+   * DELETE = permanent removal. Period.
+   * For deactivation, use update({ is_active: false })
+   *
+   * @param {number|string} id - User ID
+   * @returns {Promise<Object>} Deleted user data
+   * @throws {Error} If user not found
+   */
+  static async delete(id) {
     // TYPE SAFETY: Ensure id is a valid positive integer
-    const safeId = toSafeInteger(id, "userId", { min: 1, allowNull: false });
+    const safeId = toSafeInteger(id, 'userId', { min: 1, allowNull: false });
 
     try {
-      if (hardDelete) {
-        // Hard delete - user removed from database
-        const query = "DELETE FROM users WHERE id = $1 RETURNING *";
-        const result = await db.query(query, [safeId]);
+      const query = 'DELETE FROM users WHERE id = $1 RETURNING *';
+      const result = await db.query(query, [safeId]);
 
-        if (result.rows.length === 0) {
-          throw new Error("User not found");
-        }
-
-        return result.rows[0];
-      } else {
-        // Soft delete - set is_active = false (recommended)
-        const query = `
-          UPDATE users 
-          SET is_active = false, updated_at = CURRENT_TIMESTAMP 
-          WHERE id = $1 
-          RETURNING *
-        `;
-        const result = await db.query(query, [safeId]);
-
-        if (result.rows.length === 0) {
-          throw new Error("User not found");
-        }
-
-        return result.rows[0];
+      if (result.rows.length === 0) {
+        throw new Error('User not found');
       }
+
+      return result.rows[0];
     } catch (error) {
-      logger.error("Error deleting user", {
+      logger.error('Error deleting user', {
         error: error.message,
         userId: id,
-        hardDelete,
       });
       throw error;
+    }
+  }
+
+  /**
+   * Find user by ID including inactive users (admin function)
+   * Same as findById but doesn't filter by is_active
+   *
+   * TYPE SAFE: Validates id is a positive integer
+   *
+   * @param {number|string} id - User ID (will be coerced to integer)
+   * @returns {Promise<Object|null>} User object with role or null if not found
+   * @throws {Error} If id is not a valid positive integer
+   */
+  static async findByIdIncludingInactive(id) {
+    // TYPE SAFETY: Ensure id is a valid positive integer
+    const safeId = toSafeInteger(id, 'userId', { min: 1, allowNull: false });
+
+    try {
+      const query = this._buildUserWithRoleQuery('WHERE u.id = $1');
+      const result = await db.query(query, [safeId]);
+      return result.rows[0] || null;
+    } catch (error) {
+      logger.error('Error finding user by ID (including inactive)', {
+        error: error.message,
+        userId: id,
+      });
+      throw new Error('Failed to find user');
+    }
+  }
+
+  /**
+   * Get all users including inactive (admin function)
+   * KISS: Direct JOIN with users.role_id (many-to-one relationship)
+   *
+   * @param {boolean} [includeInactive=false] - Include deactivated users
+   * @returns {Promise<Array>} Array of user objects with roles
+   */
+  static async getAllIncludingInactive(includeInactive = false) {
+    try {
+      const whereClause = includeInactive ? '' : 'WHERE u.is_active = true';
+      const query = this._buildUserWithRoleQuery(
+        whereClause,
+        'ORDER BY u.created_at DESC',
+      );
+      const result = await db.query(query);
+      return result.rows;
+    } catch (error) {
+      logger.error('Error getting all users', { error: error.message });
+      throw new Error('Failed to retrieve users');
     }
   }
 }

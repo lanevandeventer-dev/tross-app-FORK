@@ -4,7 +4,7 @@
 import 'package:flutter/material.dart';
 import '../../config/app_spacing.dart';
 import '../molecules/error_card.dart';
-import '../molecules/error_action_buttons.dart';
+import '../molecules/buttons/button_group.dart';
 
 /// AsyncDataWidget - Idiomatic Flutter async data loading
 ///
@@ -81,12 +81,13 @@ class AsyncDataWidget<T> extends StatelessWidget {
               child: ErrorCard(
                 title: errorTitle ?? 'Failed to Load Data',
                 message: error.toString(),
-                actions: onRetry != null
+                buttons: onRetry != null
                     ? [
-                        ErrorAction.retry(
-                          onRetry: (context) async {
-                            await onRetry!();
-                          },
+                        ButtonConfig(
+                          label: 'Retry',
+                          icon: Icons.refresh,
+                          onPressed: onRetry,
+                          isPrimary: true,
                         ),
                       ]
                     : null,
@@ -229,11 +230,12 @@ abstract class StatefulAsyncWidget<T> extends StatefulWidget {
         child: ErrorCard(
           title: errorTitle,
           message: error.toString(),
-          actions: [
-            ErrorAction.retry(
-              onRetry: (context) async {
-                retry();
-              },
+          buttons: [
+            ButtonConfig(
+              label: 'Retry',
+              icon: Icons.refresh,
+              onPressed: retry,
+              isPrimary: true,
             ),
           ],
         ),

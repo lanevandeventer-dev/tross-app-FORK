@@ -3,25 +3,24 @@
  * Testing JWT token generation, refresh, and revocation
  */
 
+// Setup mocks FIRST (before any imports)
+const { setupModuleMocks, setupMocks, MOCK_USERS } = require("../../setup/test-setup");
+setupModuleMocks();
+
+// NOW import modules (they'll use the mocks)
 const TokenService = require("../../../services/token-service");
-const { TEST_USERS } = require("../../fixtures/test-data");
+const db = require("../../../db/connection");
+const logger = require("../../../config/logger");
 const { setTestEnv } = require("../../helpers/test-helpers");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
 
-// Mock the database connection
-jest.mock("../../../db/connection", () => ({
-  query: jest.fn(),
-}));
-
-const pool = require("../../../db/connection");
-
 describe("TokenService", () => {
   let originalEnv;
   const testUser = {
-    id: 1,
-    email: TEST_USERS.technician.email,
-    role: TEST_USERS.technician.role,
+    id: MOCK_USERS.technician.id,
+    email: MOCK_USERS.technician.email,
+    role: "technician",
   };
 
   beforeEach(() => {
@@ -40,7 +39,7 @@ describe("TokenService", () => {
   describe("generateTokenPair()", () => {
     test("should generate valid access and refresh tokens", async () => {
       // Mock successful database insertion
-      pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+      db.query.mockResolvedValueOnce({ rows: [], rowCount: 1 });
 
       const result = await TokenService.generateTokenPair(
         testUser,
@@ -59,15 +58,15 @@ describe("TokenService", () => {
     });
 
     test("should store refresh token hash in database", async () => {
-      pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+      db.query.mockResolvedValueOnce({ rows: [], rowCount: 1 });
 
       await TokenService.generateTokenPair(testUser, "127.0.0.1", "test-agent");
 
       // Verify database query was called
-      expect(pool.query).toHaveBeenCalledTimes(1);
+      expect(db.query).toHaveBeenCalledTimes(1);
 
       // Check that hash was stored (not raw token)
-      const queryCall = pool.query.mock.calls[0];
+      const queryCall = db.query.mock.calls[0];
       expect(queryCall[0]).toContain("INSERT INTO refresh_tokens");
       expect(queryCall[1]).toEqual(
         expect.arrayContaining([
@@ -82,7 +81,7 @@ describe("TokenService", () => {
     });
 
     test("should set correct token expiration times", async () => {
-      pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+      db.query.mockResolvedValueOnce({ rows: [], rowCount: 1 });
 
       const result = await TokenService.generateTokenPair(testUser);
 
@@ -102,7 +101,7 @@ describe("TokenService", () => {
     });
 
     test("should include user metadata in access token", async () => {
-      pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+      db.query.mockResolvedValueOnce({ rows: [], rowCount: 1 });
 
       const result = await TokenService.generateTokenPair(testUser);
 
@@ -116,7 +115,7 @@ describe("TokenService", () => {
     });
 
     test("should handle database errors gracefully", async () => {
-      pool.query.mockRejectedValueOnce(new Error("Database connection failed"));
+      db.query.mockRejectedValueOnce(new Error("Database connection failed"));
 
       await expect(TokenService.generateTokenPair(testUser)).rejects.toThrow(
         "Database connection failed",
@@ -124,7 +123,7 @@ describe("TokenService", () => {
     });
 
     test("should work without optional IP and user agent", async () => {
-      pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+      db.query.mockResolvedValueOnce({ rows: [], rowCount: 1 });
 
       const result = await TokenService.generateTokenPair(testUser);
 
@@ -132,7 +131,7 @@ describe("TokenService", () => {
       expect(result).toHaveProperty("refreshToken");
 
       // Verify null values were passed for optional params
-      const queryCall = pool.query.mock.calls[0];
+      const queryCall = db.query.mock.calls[0];
       expect(queryCall[1][4]).toBeNull(); // ip_address
       expect(queryCall[1][5]).toBeNull(); // user_agent
     });
@@ -144,7 +143,7 @@ describe("TokenService", () => {
 
     beforeEach(async () => {
       // Generate a valid refresh token for testing
-      pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+      db.query.mockResolvedValueOnce({ rows: [], rowCount: 1 });
       const tokens = await TokenService.generateTokenPair(testUser);
       validRefreshToken = tokens.refreshToken;
 
@@ -158,7 +157,7 @@ describe("TokenService", () => {
     test("should generate new access token with valid refresh token", async () => {
       // Mock finding the refresh token in database (JOIN query)
       const hashedToken = await bcrypt.hash(validRefreshToken, 10);
-      pool.query
+      db.query
         // First call: SELECT with JOIN (token + user data)
         .mockResolvedValueOnce({
           rows: [
@@ -197,7 +196,7 @@ describe("TokenService", () => {
 
     test("should update refresh token last_used_at timestamp", async () => {
       const hashedToken = await bcrypt.hash(validRefreshToken, 10);
-      pool.query
+      db.query
         // SELECT with JOIN
         .mockResolvedValueOnce({
           rows: [
@@ -223,15 +222,15 @@ describe("TokenService", () => {
       await TokenService.refreshAccessToken(validRefreshToken);
 
       // Verify UPDATE query was called (second call)
-      expect(pool.query).toHaveBeenCalledTimes(4);
-      const updateCall = pool.query.mock.calls[1];
+      expect(db.query).toHaveBeenCalledTimes(4);
+      const updateCall = db.query.mock.calls[1];
       expect(updateCall[0]).toContain("UPDATE refresh_tokens");
       expect(updateCall[0]).toContain("last_used_at");
     });
 
     test("should reject expired refresh token", async () => {
       // Mock returns empty because WHERE clause filters out expired token
-      pool.query.mockResolvedValueOnce({
+      db.query.mockResolvedValueOnce({
         rows: [],
         rowCount: 0,
       });
@@ -243,7 +242,7 @@ describe("TokenService", () => {
 
     test("should reject revoked refresh token", async () => {
       // Mock returns empty because WHERE clause filters out revoked tokens
-      pool.query.mockResolvedValueOnce({
+      db.query.mockResolvedValueOnce({
         rows: [],
         rowCount: 0,
       });
@@ -262,7 +261,7 @@ describe("TokenService", () => {
     });
 
     test("should reject if refresh token not found in database", async () => {
-      pool.query.mockResolvedValueOnce({
+      db.query.mockResolvedValueOnce({
         rows: [],
         rowCount: 0,
       });
@@ -276,19 +275,19 @@ describe("TokenService", () => {
   describe("revokeToken()", () => {
     test("should mark token as revoked in database", async () => {
       const tokenId = "550e8400-e29b-41d4-a716-446655440000"; // Valid UUID v4
-      pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+      db.query.mockResolvedValueOnce({ rows: [], rowCount: 1 });
 
       await TokenService.revokeToken(tokenId, "logout");
 
-      expect(pool.query).toHaveBeenCalledTimes(1);
-      const queryCall = pool.query.mock.calls[0];
+      expect(db.query).toHaveBeenCalledTimes(1);
+      const queryCall = db.query.mock.calls[0];
       expect(queryCall[0]).toContain("UPDATE refresh_tokens");
       expect(queryCall[0]).toContain("revoked_at = NOW()"); // Updated to match actual SQL
       expect(queryCall[1]).toEqual([tokenId]);
     });
 
     test("should handle non-existent token gracefully", async () => {
-      pool.query.mockResolvedValueOnce({ rows: [], rowCount: 0 });
+      db.query.mockResolvedValueOnce({ rows: [], rowCount: 0 });
 
       // Should not throw, just log warning
       await expect(
@@ -299,27 +298,27 @@ describe("TokenService", () => {
     test("should allow custom revocation reason", async () => {
       const tokenId = "550e8400-e29b-41d4-a716-446655440000";
       const reason = "security_breach";
-      pool.query.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+      db.query.mockResolvedValueOnce({ rows: [], rowCount: 1 });
 
       await TokenService.revokeToken(tokenId, reason);
 
       // Verify reason is logged (implementation dependent)
-      expect(pool.query).toHaveBeenCalled();
+      expect(db.query).toHaveBeenCalled();
     });
   });
 
   describe("revokeAllUserTokens()", () => {
     test("should revoke all tokens for a user", async () => {
       const userId = 1;
-      pool.query.mockResolvedValueOnce({ rows: [], rowCount: 3 }); // 3 tokens revoked
+      db.query.mockResolvedValueOnce({ rows: [], rowCount: 3 }); // 3 tokens revoked
 
       const result = await TokenService.revokeAllUserTokens(
         userId,
         "logout_all",
       );
 
-      expect(pool.query).toHaveBeenCalledTimes(1);
-      const queryCall = pool.query.mock.calls[0];
+      expect(db.query).toHaveBeenCalledTimes(1);
+      const queryCall = db.query.mock.calls[0];
       expect(queryCall[0]).toContain("UPDATE refresh_tokens");
       expect(queryCall[0]).toContain("user_id = $1");
       expect(queryCall[1]).toEqual([userId]);
@@ -327,7 +326,7 @@ describe("TokenService", () => {
     });
 
     test("should return zero if user has no tokens", async () => {
-      pool.query.mockResolvedValueOnce({ rows: [], rowCount: 0 });
+      db.query.mockResolvedValueOnce({ rows: [], rowCount: 0 });
 
       const result = await TokenService.revokeAllUserTokens(999);
 
@@ -337,19 +336,19 @@ describe("TokenService", () => {
 
   describe("cleanupExpiredTokens()", () => {
     test("should delete expired tokens from database", async () => {
-      pool.query.mockResolvedValueOnce({ rows: [], rowCount: 5 }); // 5 tokens deleted
+      db.query.mockResolvedValueOnce({ rows: [], rowCount: 5 }); // 5 tokens deleted
 
       const result = await TokenService.cleanupExpiredTokens();
 
-      expect(pool.query).toHaveBeenCalledTimes(1);
-      const queryCall = pool.query.mock.calls[0];
+      expect(db.query).toHaveBeenCalledTimes(1);
+      const queryCall = db.query.mock.calls[0];
       expect(queryCall[0]).toContain("DELETE FROM refresh_tokens");
       expect(queryCall[0]).toContain("expires_at < NOW()");
       expect(result).toBe(5);
     });
 
     test("should return zero if no expired tokens", async () => {
-      pool.query.mockResolvedValueOnce({ rows: [], rowCount: 0 });
+      db.query.mockResolvedValueOnce({ rows: [], rowCount: 0 });
 
       const result = await TokenService.cleanupExpiredTokens();
 
@@ -357,7 +356,7 @@ describe("TokenService", () => {
     });
 
     test("should handle database errors during cleanup", async () => {
-      pool.query.mockRejectedValueOnce(new Error("Cleanup failed"));
+      db.query.mockRejectedValueOnce(new Error("Cleanup failed"));
 
       await expect(TokenService.cleanupExpiredTokens()).rejects.toThrow(
         "Cleanup failed",
@@ -387,7 +386,7 @@ describe("TokenService", () => {
         },
       ];
 
-      pool.query.mockResolvedValueOnce({
+      db.query.mockResolvedValueOnce({
         rows: mockTokens,
         rowCount: 2,
       });
@@ -397,14 +396,14 @@ describe("TokenService", () => {
       expect(result).toHaveLength(2);
       expect(result[0]).toHaveProperty("id", "token-1");
       expect(result[1]).toHaveProperty("id", "token-2");
-      expect(pool.query).toHaveBeenCalledWith(
+      expect(db.query).toHaveBeenCalledWith(
         expect.stringContaining("SELECT"),
         [userId],
       );
     });
 
     test("should return empty array if user has no tokens", async () => {
-      pool.query.mockResolvedValueOnce({ rows: [], rowCount: 0 });
+      db.query.mockResolvedValueOnce({ rows: [], rowCount: 0 });
 
       const result = await TokenService.getUserTokens(999);
 
@@ -414,7 +413,7 @@ describe("TokenService", () => {
 
   describe("Error Handling", () => {
     test("should throw descriptive errors", async () => {
-      pool.query.mockRejectedValueOnce(new Error("Connection timeout"));
+      db.query.mockRejectedValueOnce(new Error("Connection timeout"));
 
       await expect(TokenService.generateTokenPair(testUser)).rejects.toThrow(
         "Connection timeout",

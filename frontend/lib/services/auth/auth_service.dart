@@ -190,12 +190,10 @@ class AuthService {
 
   /// Development Test Token Login
   ///
+  /// Supports all roles: admin, manager, dispatcher, technician, client
   /// Security: Triple-validated (UI hidden, service blocked, backend rejected)
-  Future<bool> loginWithTestToken({bool isAdmin = false}) async {
-    ErrorService.logInfo(
-      'Test token login started',
-      context: {'isAdmin': isAdmin},
-    );
+  Future<bool> loginWithTestToken({required String role}) async {
+    ErrorService.logInfo('Test token login started', context: {'role': role});
 
     // SECURITY LAYER 2: Service-level validation
     // Throws StateError in production - caught and logged
@@ -208,7 +206,7 @@ class AuthService {
         'Security violation: Dev authentication attempted in production',
         context: {
           'method': 'loginWithTestToken',
-          'isAdmin': isAdmin,
+          'role': role,
           'environment': AppConfig.environmentName,
         },
         error: e,
@@ -219,10 +217,10 @@ class AuthService {
     try {
       ErrorService.logInfo(
         'Calling ApiClient.getTestToken',
-        context: {'isAdmin': isAdmin},
+        context: {'role': role},
       );
 
-      final token = await ApiClient.getTestToken(isAdmin: isAdmin);
+      final token = await ApiClient.getTestToken(role: role);
 
       ErrorService.logInfo(
         'Test token received',
@@ -255,7 +253,7 @@ class AuthService {
 
           ErrorService.logInfo(
             'Test login successful',
-            context: {'isAdmin': isAdmin, 'role': _user?['role']},
+            context: {'role': role, 'actualRole': _user?['role']},
           );
           return true;
         } else {

@@ -3,6 +3,20 @@
  * Global configuration and setup for all tests
  */
 
+// Mock logger GLOBALLY (before any other imports that use logger)
+// Must match the actual export structure from config/logger.js
+jest.mock("../../config/logger", () => ({
+  logger: {
+    error: jest.fn(),
+    warn: jest.fn(),
+    info: jest.fn(),
+    debug: jest.fn(),
+    log: jest.fn(),
+  },
+  requestLogger: jest.fn((req, res, next) => next()),
+  logSecurityEvent: jest.fn(),
+}));
+
 const { setTestEnv, cleanupTestEnv } = require("../helpers/test-helpers");
 const { DATABASE } = require("../../config/constants");
 const testLogger = require("../../config/test-logger");

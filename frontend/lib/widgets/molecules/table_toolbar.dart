@@ -8,7 +8,7 @@ library;
 
 import 'package:flutter/material.dart';
 import '../../config/app_spacing.dart';
-import 'search_bar.dart' as custom;
+import '../organisms/search/search_bar.dart' as custom;
 
 class TableToolbar extends StatelessWidget {
   final String? title;
@@ -31,13 +31,6 @@ class TableToolbar extends StatelessWidget {
 
     return Container(
       padding: spacing.paddingLG,
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(
-            color: theme.colorScheme.outline.withValues(alpha: 0.2),
-          ),
-        ),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -46,13 +39,14 @@ class TableToolbar extends StatelessWidget {
             Padding(
               padding: EdgeInsets.only(bottom: spacing.lg),
               child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   if (leading != null) ...[
                     leading!,
                     SizedBox(width: spacing.md),
                   ],
                   if (title != null)
-                    Expanded(
+                    Flexible(
                       child: Text(
                         title!,
                         style: theme.textTheme.titleLarge?.copyWith(
@@ -60,7 +54,8 @@ class TableToolbar extends StatelessWidget {
                         ),
                       ),
                     ),
-                  if (actions != null)
+                  if (actions != null) ...[
+                    SizedBox(width: spacing.md),
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children:
@@ -74,6 +69,7 @@ class TableToolbar extends StatelessWidget {
                               .toList()
                             ..removeLast(), // Remove last spacer
                     ),
+                  ],
                 ],
               ),
             ),

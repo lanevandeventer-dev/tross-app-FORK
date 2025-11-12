@@ -10,9 +10,11 @@
  * - User.relationships.test.js (this file) - Role relationships and foreign keys
  */
 
-// Mock database BEFORE requiring User model
-jest.mock("../../../db/connection");
+// Setup centralized mocks FIRST
+const { setupModuleMocks } = require("../../setup/test-setup");
+setupModuleMocks();
 
+// NOW import modules
 const User = require("../../../db/models/User");
 const db = require("../../../db/connection");
 
@@ -135,26 +137,30 @@ describe("User Model - Relationships", () => {
       );
     });
 
-    it("should include role name in getAll results", async () => {
+    it("should include role name in findAll results", async () => {
       // Arrange
       const mockUsers = [
         { id: 1, email: "admin@example.com", role_id: 1, role: "admin" },
         { id: 2, email: "client@example.com", role_id: 2, role: "client" },
         { id: 3, email: "manager@example.com", role_id: 3, role: "manager" },
       ];
-      db.query.mockResolvedValue({ rows: mockUsers });
+      db.query
+        .mockResolvedValueOnce({ rows: [{ total: 3 }] }) // count query
+        .mockResolvedValueOnce({ rows: mockUsers }); // data query
 
       // Act
-      const users = await User.getAll();
+      const result = await User.findAll();
 
       // Assert
-      expect(users).toEqual(mockUsers);
-      users.forEach((user) => {
+      expect(result.data).toEqual(mockUsers);
+      result.data.forEach((user) => {
         expect(user.role).toBeDefined();
         expect(user.role_id).toBeDefined();
       });
+      // Updated expectation: now passes parameters for filters
       expect(db.query).toHaveBeenCalledWith(
-        expect.stringContaining("SELECT u.*, r.name as role"),
+        expect.stringContaining("SELECT COUNT(*) as total"),
+        expect.any(Array) // Now passes parameters array
       );
     });
   });

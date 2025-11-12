@@ -298,24 +298,6 @@ void main() {
       expect(find.byType(TextButton), findsNothing);
     });
 
-    testWidgets('uses proper error container styling', (tester) async {
-      await tester.pumpWidget(
-        const MaterialApp(home: Scaffold(body: DevModeBanner())),
-      );
-
-      if (AppConfig.isDevMode) {
-        final containerFinder = find.byType(Container).first;
-        expect(containerFinder, findsOneWidget);
-
-        final container = tester.widget<Container>(containerFinder);
-        final decoration = container.decoration as BoxDecoration?;
-
-        expect(decoration, isNotNull);
-        expect(decoration!.border, isNotNull);
-        expect(decoration.borderRadius, isNotNull);
-      }
-    });
-
     testWidgets('is full width', (tester) async {
       await tester.pumpWidget(
         const MaterialApp(

@@ -9,6 +9,8 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../config/app_spacing.dart';
+import '../../../services/notification_service.dart';
+import '../../../utils/helpers/helpers.dart';
 
 enum ValueEmphasis { primary, secondary, tertiary }
 
@@ -56,23 +58,8 @@ class DataValue extends StatelessWidget {
 
   /// Factory for timestamps (secondary emphasis)
   factory DataValue.timestamp(DateTime timestamp) {
-    final formatted = _formatTimestamp(timestamp);
+    final formatted = DateTimeHelpers.formatTimestamp(timestamp);
     return DataValue(text: formatted, emphasis: ValueEmphasis.secondary);
-  }
-
-  static String _formatTimestamp(DateTime dt) {
-    final now = DateTime.now();
-    final diff = now.difference(dt);
-
-    if (diff.inDays == 0) {
-      return 'Today ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-    } else if (diff.inDays == 1) {
-      return 'Yesterday';
-    } else if (diff.inDays < 7) {
-      return '${diff.inDays} days ago';
-    } else {
-      return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
-    }
   }
 
   @override
@@ -151,12 +138,6 @@ class DataValue extends StatelessWidget {
 
   void _copyToClipboard(BuildContext context) {
     Clipboard.setData(ClipboardData(text: text));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Copied: $text'),
-        duration: const Duration(seconds: 2),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    NotificationService.showInfo(context, 'Copied: $text');
   }
 }

@@ -1,9 +1,15 @@
-/// ActionButton - Atom component for table/UI actions
+/// ActionButton - Icon button for table/UI actions (edit, delete, view)
 ///
-/// Consistent action buttons with icons and tooltips
-/// Supports primary, secondary, and danger variants
+/// **Atom**: Pure UI, no dependencies. Always provide tooltip for accessibility.
 ///
-/// Material 3 Design with TrossApp branding
+/// **Features**: 4 styles (primary/secondary/danger/ghost), compact mode, disabled state
+///
+/// **Usage**:
+/// ```dart
+/// ActionButton.edit(onPressed: () => edit(user))
+/// ActionButton.delete(onPressed: hasPermission ? delete : null)
+/// ActionButton.view(onPressed: showDetails, compact: true)
+/// ```
 library;
 
 import 'package:flutter/material.dart';

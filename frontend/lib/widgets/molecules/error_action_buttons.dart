@@ -2,6 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../config/app_spacing.dart';
+import '../atoms/atoms.dart';
+import '../../services/notification_service.dart';
 
 /// Represents a single action on an error page
 /// Supports both navigation and async callbacks (e.g., retry)
@@ -75,26 +77,19 @@ class ErrorAction {
           if (await canLaunchUrl(uri)) {
             await launchUrl(uri);
           } else {
-            // Fallback: Show email in snackbar if can't launch email client
+            // Fallback: Show email in notification if can't launch email client
             if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Email us at: $supportEmail'),
-                  duration: const Duration(seconds: 5),
-                  action: SnackBarAction(
-                    label: 'Copy',
-                    onPressed: () {
-                      // TODO: Copy to clipboard if needed
-                    },
-                  ),
-                ),
+              NotificationService.showInfo(
+                context,
+                'Email us at: $supportEmail',
               );
             }
           }
         } catch (e) {
           if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Contact us at: $supportEmail')),
+            NotificationService.showInfo(
+              context,
+              'Contact us at: $supportEmail',
             );
           }
         }
@@ -150,23 +145,17 @@ class _ActionButtonState extends State<_ActionButton> {
     if (widget.action.onPressed != null) {
       setState(() => _isLoading = true);
 
-      // Capture values needed after async gap
       final messenger = ScaffoldMessenger.of(context);
-      final errorColor = Theme.of(context).colorScheme.error;
-
       try {
         await widget.action.onPressed!(context);
       } catch (error) {
-        if (!mounted) {
+        if (mounted) {
           setState(() => _isLoading = false);
-          return;
+          messenger.showSnackBar(
+            ErrorSnackBar(message: 'Action failed: $error'),
+          );
         }
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text('Action failed: $error'),
-            backgroundColor: errorColor,
-          ),
-        );
+        return;
       }
 
       if (mounted) {

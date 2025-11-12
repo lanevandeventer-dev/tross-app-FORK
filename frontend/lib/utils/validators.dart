@@ -7,17 +7,43 @@
 /// 1. USER INPUT: Form fields, text inputs (returns String? error message)
 /// 2. DATA VALIDATION: API responses, JSON parsing (throws or returns safe values)
 ///
+/// DATA VALIDATORS (toSafe* methods):
+/// - `toSafeInt()` - Extract/validate integers with range checking
+/// - `toSafeDouble()` - Extract/validate floating-point numbers
+/// - `toSafeString()` - Extract/validate strings with length constraints
+/// - `toSafeBool()` - Extract/validate booleans from various formats
+/// - `toSafeDateTime()` - Extract/validate ISO8601 timestamps
+/// - `toSafeEmail()` - Extract/validate email addresses
+/// - `toSafeUuid()` - Extract/validate UUID v4 identifiers
+///
+/// FORM VALIDATORS (returns String? for TextFormField):
+/// - `required()` - Check non-empty
+/// - `email()` - Validate email format
+/// - `minLength()` / `maxLength()` - String length constraints
+/// - `integer()` / `positive()` - Numeric format validation
+/// - `integerRange()` - Range-constrained numeric validation
+/// - `combine()` - Chain multiple validators
+///
 /// Usage:
 /// ```dart
-/// // User input validation (for forms)
-/// final emailError = Validators.email(emailValue);
-/// if (emailError != null) {
-///   // Show error
-/// }
-///
 /// // Data validation (for API responses)
-/// final safeId = Validators.toSafeInt(json['id'], 'user.id');
+/// final userId = Validators.toSafeInt(json['user_id'], 'user_id', min: 1);
+/// final email = Validators.toSafeEmail(json['email'], 'email');
+/// final uuid = Validators.toSafeUuid(json['token'], 'token', allowNull: true);
+///
+/// // Form validation (for TextFormField)
+/// TextFormField(
+///   validator: Validators.email,
+///   autovalidateMode: AutovalidateMode.onUserInteraction,
+/// )
 /// ```
+///
+/// Backend Alignment:
+/// - Matches `backend/validators/type-coercion.js` behavior
+/// - Consistent error messages across stack
+/// - Same null handling and type coercion rules
+///
+/// @since 2025-11-07 - Added toSafeDouble, toSafeUuid, improved toSafeInt
 library;
 
 class Validators {
@@ -33,7 +59,10 @@ class Validators {
   /// Returns integer if valid, null if value is null/empty (when allowNull=true),
   /// throws descriptive error otherwise
   ///
-  /// Matches backend toSafeInteger() behavior
+  /// Matches backend toSafeInteger() behavior:
+  /// - Coerces doubles to integers (3.14 → 3)
+  /// - Parses strings with trimming
+  /// - Validates min/max ranges
   static int? toSafeInt(
     dynamic value,
     String fieldName, {
@@ -56,6 +85,18 @@ class Validators {
         throw ArgumentError('$fieldName must be at most $max (got $value)');
       }
       return value;
+    }
+
+    // Coerce double to int (matches backend parseInt behavior)
+    if (value is double) {
+      final intValue = value.toInt();
+      if (min != null && intValue < min) {
+        throw ArgumentError('$fieldName must be at least $min (got $intValue)');
+      }
+      if (max != null && intValue > max) {
+        throw ArgumentError('$fieldName must be at most $max (got $intValue)');
+      }
+      return intValue;
     }
 
     // Try parsing from string
@@ -85,6 +126,80 @@ class Validators {
     // Invalid type
     throw ArgumentError(
       '$fieldName must be an integer or string (got ${value.runtimeType})',
+    );
+  }
+
+  /// Safely extract double from dynamic value
+  ///
+  /// Returns double if valid, null if value is null/empty (when allowNull=true),
+  /// throws descriptive error otherwise
+  ///
+  /// Matches backend behavior for numeric fields
+  static double? toSafeDouble(
+    dynamic value,
+    String fieldName, {
+    bool allowNull = false,
+    double? min,
+    double? max,
+  }) {
+    // Handle null/undefined
+    if (value == null) {
+      if (allowNull) return null;
+      throw ArgumentError('$fieldName is required but received null');
+    }
+
+    // If already double, validate range
+    if (value is double) {
+      if (min != null && value < min) {
+        throw ArgumentError('$fieldName must be at least $min (got $value)');
+      }
+      if (max != null && value > max) {
+        throw ArgumentError('$fieldName must be at most $max (got $value)');
+      }
+      return value;
+    }
+
+    // Coerce int to double
+    if (value is int) {
+      final doubleValue = value.toDouble();
+      if (min != null && doubleValue < min) {
+        throw ArgumentError(
+          '$fieldName must be at least $min (got $doubleValue)',
+        );
+      }
+      if (max != null && doubleValue > max) {
+        throw ArgumentError(
+          '$fieldName must be at most $max (got $doubleValue)',
+        );
+      }
+      return doubleValue;
+    }
+
+    // Try parsing from string
+    if (value is String) {
+      if (value.trim().isEmpty) {
+        if (allowNull) return null;
+        throw ArgumentError('$fieldName is required but received empty string');
+      }
+
+      final parsed = double.tryParse(value.trim());
+      if (parsed == null) {
+        throw ArgumentError('$fieldName must be a valid number (got "$value")');
+      }
+
+      if (min != null && parsed < min) {
+        throw ArgumentError('$fieldName must be at least $min (got $parsed)');
+      }
+      if (max != null && parsed > max) {
+        throw ArgumentError('$fieldName must be at most $max (got $parsed)');
+      }
+
+      return parsed;
+    }
+
+    // Invalid type
+    throw ArgumentError(
+      '$fieldName must be a number or string (got ${value.runtimeType})',
     );
   }
 
@@ -161,6 +276,8 @@ class Validators {
   ///
   /// Returns DateTime if valid, null if value is null (when allowNull=true),
   /// throws descriptive error otherwise
+  ///
+  /// Matches backend behavior for timestamp fields
   static DateTime? toSafeDateTime(
     dynamic value,
     String fieldName, {
@@ -174,6 +291,12 @@ class Validators {
     if (value is DateTime) return value;
 
     if (value is String) {
+      // Handle empty string like backend does
+      if (value.trim().isEmpty) {
+        if (allowNull) return null;
+        throw ArgumentError('$fieldName is required but received empty string');
+      }
+
       try {
         return DateTime.parse(value);
       } catch (e) {
@@ -208,6 +331,49 @@ class Validators {
     return str;
   }
 
+  /// Safely extract UUID v4 from dynamic value
+  ///
+  /// Returns UUID string if valid, null if value is null/empty (when allowNull=true),
+  /// throws descriptive error otherwise
+  ///
+  /// Matches backend toSafeUuid() validation
+  static String? toSafeUuid(
+    dynamic value,
+    String fieldName, {
+    bool allowNull = false,
+  }) {
+    // Handle null/undefined/empty
+    if (value == null) {
+      if (allowNull) return null;
+      throw ArgumentError('$fieldName is required but received null');
+    }
+
+    // Must be string
+    if (value is! String) {
+      throw ArgumentError(
+        '$fieldName must be a valid UUID string (got ${value.runtimeType})',
+      );
+    }
+
+    final str = value.trim();
+    if (str.isEmpty) {
+      if (allowNull) return null;
+      throw ArgumentError('$fieldName is required but received empty string');
+    }
+
+    // UUID v4 pattern: 8-4-4-4-12 hex digits
+    // Version bit must be 4, variant bits must be 8/9/a/b
+    final uuidRegex = RegExp(
+      r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$',
+    );
+
+    if (!uuidRegex.hasMatch(str)) {
+      throw ArgumentError('$fieldName must be a valid UUID v4 (got "$str")');
+    }
+
+    return str;
+  }
+
   // ==========================================================================
   // USER INPUT VALIDATION (Form Fields)
   // ==========================================================================
@@ -225,15 +391,16 @@ class Validators {
   /// Validate email format
   ///
   /// Returns error message if email is invalid, otherwise null
-  /// Matches backend email validation pattern
+  /// Permissive validation - accepts any TLD format (matches backend)
   static String? email(String? value) {
     // First check if required
     final requiredError = required(value, fieldName: 'Email');
     if (requiredError != null) return requiredError;
 
-    // RFC 5322 simplified pattern (matches most real-world emails)
+    // Permissive email pattern - accepts ANY TLD (including new/custom TLDs)
+    // Format: localpart@domain.tld
     final emailRegex = RegExp(
-      r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
+      r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z0-9]+$',
     );
 
     if (!emailRegex.hasMatch(value!.trim())) {

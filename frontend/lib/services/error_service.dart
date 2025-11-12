@@ -2,6 +2,7 @@ import 'dart:developer' as developer;
 import 'package:flutter/foundation.dart';
 
 import '../config/constants.dart';
+import '../utils/helpers/string_helper.dart';
 
 /// Centralized Error Service for Tross
 /// KISS Principle: Simple, consistent error handling across the app
@@ -102,7 +103,7 @@ class ErrorService {
   static String getUserFriendlyMessage(dynamic error) {
     if (error == null) return 'An unexpected error occurred';
 
-    final errorString = error.toString().toLowerCase();
+    final errorString = StringHelper.toLowerCase(error.toString());
 
     // Map technical errors to user-friendly messages
     if (errorString.contains('network') || errorString.contains('connection')) {

@@ -1,13 +1,13 @@
 /**
  * Auth0 Authentication Service
  */
-const jwt = require("jsonwebtoken");
-const jwksClient = require("jwks-rsa");
-const axios = require("axios");
-const { AuthenticationClient, ManagementClient } = require("auth0");
-const { logger } = require("../config/logger");
-const { UserDataService } = require("./user-data");
-const auth0Config = require("../config/auth0");
+const jwt = require('jsonwebtoken');
+const jwksClient = require('jwks-rsa');
+const axios = require('axios');
+const { AuthenticationClient, ManagementClient } = require('auth0');
+const { logger } = require('../config/logger');
+const { UserDataService } = require('./user-data');
+const auth0Config = require('../config/auth0');
 
 class Auth0Auth {
   constructor() {
@@ -21,7 +21,7 @@ class Auth0Auth {
       domain: this.config.domain,
       clientId: this.config.managementClientId,
       clientSecret: this.config.managementClientSecret,
-      scope: "read:users create:users update:users",
+      scope: 'read:users create:users update:users',
     });
     this.jwksClient = jwksClient({
       jwksUri: `https://${this.config.domain}/.well-known/jwks.json`,
@@ -38,7 +38,7 @@ class Auth0Auth {
    * Get provider name for identification
    */
   getProviderName() {
-    return "auth0";
+    return 'auth0';
   }
 
   /**
@@ -52,16 +52,16 @@ class Auth0Auth {
 
       // VALIDATE: Auth0 external API response data
       return {
-        id: toSafeString(userInfo.sub, "auth0.sub", { minLength: 1 }),
-        email: toSafeEmail(userInfo.email, "auth0.email"),
-        name: toSafeString(userInfo.name, "auth0.name", { allowNull: true }),
-        picture: toSafeString(userInfo.picture, "auth0.picture", {
+        id: toSafeString(userInfo.sub, 'auth0.sub', { minLength: 1 }),
+        email: toSafeEmail(userInfo.email, 'auth0.email'),
+        name: toSafeString(userInfo.name, 'auth0.name', { allowNull: true }),
+        picture: toSafeString(userInfo.picture, 'auth0.picture', {
           allowNull: true,
         }),
         email_verified: userInfo.email_verified === true, // Coerce to boolean
       };
     } catch (error) {
-      logger.error("Failed to get user profile from Auth0", {
+      logger.error('Failed to get user profile from Auth0', {
         error: error.message,
       });
       throw new Error(`Profile retrieval failed: ${error.message}`);
@@ -72,14 +72,14 @@ class Auth0Auth {
    * Logout - return logout URL for client to redirect to
    */
   async logout() {
-    const returnToUrl = `${process.env.CLIENT_URL || "http://localhost:3000"}/login`;
+    const returnToUrl = `${process.env.CLIENT_URL || 'http://localhost:3000'}/login`;
     const logoutUrl = this.getLogoutUrl(returnToUrl);
 
-    logger.info("Auth0 logout URL generated", { returnToUrl });
+    logger.info('Auth0 logout URL generated', { returnToUrl });
     return {
       success: true,
       logoutUrl,
-      message: "Redirect to logout URL to complete Auth0 logout",
+      message: 'Redirect to logout URL to complete Auth0 logout',
     };
   }
 
@@ -89,7 +89,7 @@ class Auth0Auth {
   async authenticate(credentials) {
     try {
       if (!credentials.code) {
-        throw new Error("Authorization code is required");
+        throw new Error('Authorization code is required');
       }
 
       // Use provided redirect_uri or fall back to config
@@ -100,7 +100,7 @@ class Auth0Auth {
       const response = await axios.post(
         `https://${this.config.domain}/oauth/token`,
         {
-          grant_type: "authorization_code",
+          grant_type: 'authorization_code',
           client_id: this.config.clientId,
           client_secret: this.config.clientSecret,
           code: credentials.code,
@@ -109,23 +109,23 @@ class Auth0Auth {
       );
 
       const tokenResponse = response.data;
-      const decodedToken = await this.verifyToken(tokenResponse.access_token);
+      const _decodedToken = await this.verifyToken(tokenResponse.access_token);
       const userInfo = await this.authClient.users.getInfo(
         tokenResponse.access_token,
       );
 
       // VALIDATE: Auth0 userInfo before using
       const validatedUserInfo = {
-        sub: toSafeString(userInfo.sub, "auth0.sub", { minLength: 1 }),
-        email: toSafeEmail(userInfo.email, "auth0.email"),
-        name: toSafeString(userInfo.name, "auth0.name", { allowNull: true }),
-        given_name: toSafeString(userInfo.given_name, "auth0.given_name", {
+        sub: toSafeString(userInfo.sub, 'auth0.sub', { minLength: 1 }),
+        email: toSafeEmail(userInfo.email, 'auth0.email'),
+        name: toSafeString(userInfo.name, 'auth0.name', { allowNull: true }),
+        given_name: toSafeString(userInfo.given_name, 'auth0.given_name', {
           allowNull: true,
         }),
-        family_name: toSafeString(userInfo.family_name, "auth0.family_name", {
+        family_name: toSafeString(userInfo.family_name, 'auth0.family_name', {
           allowNull: true,
         }),
-        picture: toSafeString(userInfo.picture, "auth0.picture", {
+        picture: toSafeString(userInfo.picture, 'auth0.picture', {
           allowNull: true,
         }),
         email_verified: userInfo.email_verified === true,
@@ -138,13 +138,13 @@ class Auth0Auth {
           userId: localUser.id,
           email: localUser.email,
           role: localUser.role,
-          provider: "auth0",
+          provider: 'auth0',
           auth0Id: validatedUserInfo.sub,
         },
         process.env.JWT_SECRET,
-        { expiresIn: "24h" },
+        { expiresIn: '24h' },
       );
-      logger.info("Auth0 authentication successful", {
+      logger.info('Auth0 authentication successful', {
         userId: localUser.id,
         email: localUser.email,
       });
@@ -158,9 +158,9 @@ class Auth0Auth {
         },
       };
     } catch (error) {
-      logger.error("Auth0 authentication failed", {
+      logger.error('Auth0 authentication failed', {
         error: error.message,
-        code: credentials.code ? "provided" : "missing",
+        code: credentials.code ? 'provided' : 'missing',
       });
       throw new Error(`Authentication failed: ${error.message}`);
     }
@@ -183,7 +183,7 @@ class Auth0Auth {
         {
           audience: this.config.audience,
           issuer: `https://${this.config.domain}/`,
-          algorithms: ["RS256"],
+          algorithms: ['RS256'],
         },
         (err, decoded) => {
           if (err) {
@@ -198,9 +198,9 @@ class Auth0Auth {
 
   getAuthorizationUrl(state) {
     return this.authClient.buildAuthorizeUrl({
-      responseType: "code",
+      responseType: 'code',
       redirectUri: this.config.callbackUrl,
-      scope: "openid profile email",
+      scope: 'openid profile email',
       state: state,
     });
   }
@@ -212,7 +212,7 @@ class Auth0Auth {
       });
       return response;
     } catch (error) {
-      logger.error("Token refresh failed", { error: error.message });
+      logger.error('Token refresh failed', { error: error.message });
       throw new Error(`Token refresh failed: ${error.message}`);
     }
   }
@@ -224,24 +224,24 @@ class Auth0Auth {
   async createAdminUser(userData) {
     try {
       const user = await this.managementClient.createUser({
-        connection: "Username-Password-Authentication",
+        connection: 'Username-Password-Authentication',
         email: userData.email,
         password: userData.password,
         email_verified: true,
         app_metadata: {
-          role: "admin",
+          role: 'admin',
         },
         user_metadata: {
           name: userData.name,
         },
       });
-      logger.info("Admin user created in Auth0", {
+      logger.info('Admin user created in Auth0', {
         userId: user.user_id,
         email: user.email,
       });
       return user;
     } catch (error) {
-      logger.error("Failed to create admin user in Auth0", {
+      logger.error('Failed to create admin user in Auth0', {
         error: error.message,
       });
       throw error;

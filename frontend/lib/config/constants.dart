@@ -2,6 +2,8 @@
 /// KISS Principle: Centralized constants prevent text mismatches
 ///
 /// ⚠️ IMPORTANT: Change app name in ONE place here, it updates EVERYWHERE
+library;
+
 import 'package:flutter/material.dart';
 
 class AppConstants {
@@ -135,10 +137,8 @@ class StyleConstants {
   static const double paddingLarge = 24.0;
   static const double paddingXLarge = 32.0;
 
-  // Sizes
-  static const double iconSizeSmall = 24.0;
-  static const double iconSizeMedium = 48.0;
-  static const double iconSizeLarge = 80.0;
+  // NOTE: Icon sizes moved to AppSpacing for responsive sizing
+  // Use context.spacing.iconSizeXS/SM/MD/LG/XL instead
 
   // Border Radius
   static const double radiusSmall = 4.0;

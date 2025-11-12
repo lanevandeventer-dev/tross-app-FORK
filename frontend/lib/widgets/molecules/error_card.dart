@@ -8,7 +8,7 @@ import '../../config/app_colors.dart';
 import '../../config/app_shadows.dart';
 import '../../config/app_borders.dart';
 import '../atoms/icons/error_icon.dart';
-import 'error_action_buttons.dart';
+import 'buttons/button_group.dart';
 
 /// Inline error card for component-level failures
 ///
@@ -27,10 +27,8 @@ import 'error_action_buttons.dart';
 /// ErrorCard(
 ///   title: 'Connection Error',
 ///   message: error.toString(),
-///   actions: [
-///     ErrorAction.retry(onRetry: (context) async {
-///       await _loadData();
-///     }),
+///   buttons: [
+///     ButtonConfig(label: 'Retry', onPressed: _loadData, isPrimary: true),
 ///   ],
 /// );
 ///
@@ -45,7 +43,7 @@ class ErrorCard extends StatelessWidget {
   final String message;
   final IconData? icon;
   final Color? iconColor;
-  final List<ErrorAction>? actions;
+  final List<ButtonConfig>? buttons;
   final bool isCompact;
   final EdgeInsets? padding;
 
@@ -55,22 +53,19 @@ class ErrorCard extends StatelessWidget {
     required this.message,
     this.icon,
     this.iconColor,
-    this.actions,
+    this.buttons,
     this.isCompact = false,
     this.padding,
   });
 
   /// Compact error card - minimal space, no icon, inline retry
-  factory ErrorCard.compact({
-    required String message,
-    Future<void> Function(BuildContext)? onRetry,
-  }) {
+  factory ErrorCard.compact({required String message, VoidCallback? onRetry}) {
     return ErrorCard(
       title: '',
       message: message,
       isCompact: true,
-      actions: onRetry != null
-          ? [ErrorAction.retry(onRetry: onRetry, label: 'Retry')]
+      buttons: onRetry != null
+          ? [ButtonConfig(label: 'Retry', onPressed: onRetry, isPrimary: true)]
           : null,
     );
   }
@@ -80,14 +75,21 @@ class ErrorCard extends StatelessWidget {
     String title = 'Connection Error',
     String message =
         'Unable to connect to server. Please check your internet connection.',
-    required Future<void> Function(BuildContext) onRetry,
+    required VoidCallback onRetry,
   }) {
     return ErrorCard(
       title: title,
       message: message,
       icon: Icons.cloud_off_rounded,
-      iconColor: AppColors.warning, // Use centralized color
-      actions: [ErrorAction.retry(onRetry: onRetry)],
+      iconColor: AppColors.warning,
+      buttons: [
+        ButtonConfig(
+          label: 'Retry',
+          icon: Icons.refresh,
+          onPressed: onRetry,
+          isPrimary: true,
+        ),
+      ],
     );
   }
 
@@ -95,14 +97,21 @@ class ErrorCard extends StatelessWidget {
   factory ErrorCard.loadFailed({
     required String resourceName,
     required String error,
-    required Future<void> Function(BuildContext) onRetry,
+    required VoidCallback onRetry,
   }) {
     return ErrorCard(
       title: 'Failed to Load $resourceName',
       message: error,
       icon: Icons.error_outline_rounded,
-      iconColor: AppColors.error, // Use centralized color
-      actions: [ErrorAction.retry(onRetry: onRetry)],
+      iconColor: AppColors.error,
+      buttons: [
+        ButtonConfig(
+          label: 'Retry',
+          icon: Icons.refresh,
+          onPressed: onRetry,
+          isPrimary: true,
+        ),
+      ],
     );
   }
 
@@ -118,14 +127,15 @@ class ErrorCard extends StatelessWidget {
         child: Padding(
           padding: padding ?? EdgeInsets.all(spacing.sm),
           child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Icon(
                 Icons.warning_amber_rounded,
-                size: 20,
+                size: spacing.lg,
                 color: theme.colorScheme.onErrorContainer,
               ),
               SizedBox(width: spacing.sm),
-              Expanded(
+              Flexible(
                 child: Text(
                   message,
                   style: theme.textTheme.bodySmall?.copyWith(
@@ -133,9 +143,9 @@ class ErrorCard extends StatelessWidget {
                   ),
                 ),
               ),
-              if (actions != null && actions!.isNotEmpty) ...[
+              if (buttons != null && buttons!.isNotEmpty) ...[
                 SizedBox(width: spacing.sm),
-                ErrorActionButtons(actions: actions!),
+                ButtonGroup.horizontal(buttons: buttons!),
               ],
             ],
           ),
@@ -157,16 +167,17 @@ class ErrorCard extends StatelessWidget {
           children: [
             // Icon and title row
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 if (icon != null) ...[
                   ErrorIcon(
                     icon: icon!,
                     color: iconColor ?? theme.colorScheme.error,
-                    size: 32,
+                    size: spacing.xl,
                   ),
                   SizedBox(width: spacing.sm),
                 ],
-                Expanded(
+                Flexible(
                   child: Text(
                     title,
                     style: theme.textTheme.titleMedium?.copyWith(
@@ -180,8 +191,8 @@ class ErrorCard extends StatelessWidget {
 
             SizedBox(height: spacing.sm),
 
-            // Error message
-            Text(
+            // Error message (selectable for copying)
+            SelectableText(
               message,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
@@ -189,9 +200,12 @@ class ErrorCard extends StatelessWidget {
             ),
 
             // Actions
-            if (actions != null && actions!.isNotEmpty) ...[
+            if (buttons != null && buttons!.isNotEmpty) ...[
               SizedBox(height: spacing.md),
-              ErrorActionButtons(actions: actions!),
+              ButtonGroup.horizontal(
+                buttons: buttons!,
+                alignment: MainAxisAlignment.start,
+              ),
             ],
           ],
         ),

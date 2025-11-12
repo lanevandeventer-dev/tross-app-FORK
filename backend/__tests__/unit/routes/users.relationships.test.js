@@ -14,13 +14,27 @@ jest.mock("../../../db/models/User");
 jest.mock("../../../db/models/Role");
 jest.mock("../../../services/audit-service");
 jest.mock("../../../utils/request-helpers");
-jest.mock("../../../middleware/auth");
+jest.mock("../../../middleware/auth", () => ({
+  authenticateToken: jest.fn((req, res, next) => next()),
+  requirePermission: jest.fn(() => (req, res, next) => next()),
+  requireMinimumRole: jest.fn(() => (req, res, next) => next()),
+}));
 
 // Mock validators with proper factory functions that return middleware
 jest.mock("../../../validators", () => ({
   validatePagination: jest.fn(() => (req, res, next) => {
     if (!req.validated) req.validated = {};
     req.validated.pagination = { page: 1, limit: 50, offset: 0 };
+    next();
+  }),
+  validateQuery: jest.fn(() => (req, res, next) => {
+    // Mock metadata-driven query validation
+    if (!req.validated) req.validated = {};
+    if (!req.validated.query) req.validated.query = {};
+    req.validated.query.search = req.query.search;
+    req.validated.query.filters = req.query.filters || {};
+    req.validated.query.sortBy = req.query.sortBy;
+    req.validated.query.sortOrder = req.query.sortOrder;
     next();
   }),
   validateIdParam: jest.fn((req, res, next) => {
@@ -54,7 +68,7 @@ const User = require("../../../db/models/User");
 const Role = require("../../../db/models/Role");
 const auditService = require("../../../services/audit-service");
 const { getClientIp, getUserAgent } = require("../../../utils/request-helpers");
-const { authenticateToken, requireAdmin } = require("../../../middleware/auth");
+const { authenticateToken, requirePermission } = require("../../../middleware/auth");
 const {
   validateRoleAssignment,
   validateIdParam,
@@ -75,7 +89,7 @@ describe("Users Routes - Role Relationships", () => {
       getClientIp,
       getUserAgent,
       authenticateToken,
-      requireAdmin,
+      requirePermission,
       validateIdParam,
       validateRoleAssignment,
     });
@@ -91,9 +105,11 @@ describe("Users Routes - Role Relationships", () => {
       const userId = 2;
       const roleId = 3;
       const mockRole = { id: roleId, name: "manager" };
+      const mockUpdatedUser = { id: userId, email: "user@test.com", role_id: roleId, role: "manager" };
 
       Role.findById.mockResolvedValue(mockRole);
       User.setRole.mockResolvedValue(true);
+      User.findById.mockResolvedValue(mockUpdatedUser); // Mock findById after setRole
       auditService.log.mockResolvedValue(true);
 
       // Act
@@ -111,6 +127,7 @@ describe("Users Routes - Role Relationships", () => {
 
       expect(Role.findById).toHaveBeenCalledWith(roleId);
       expect(User.setRole).toHaveBeenCalledWith(userId, roleId);
+      expect(User.findById).toHaveBeenCalledWith(userId); // Verify findById called after setRole
       expect(auditService.log).toHaveBeenCalledWith({
         userId: 1,
         action: "role_assign",
@@ -127,9 +144,11 @@ describe("Users Routes - Role Relationships", () => {
       const userId = 2;
       const roleId = "3"; // String instead of number
       const mockRole = { id: 3, name: "manager" };
+      const mockUpdatedUser = { id: userId, role_id: 3, role: "manager" };
 
       Role.findById.mockResolvedValue(mockRole);
       User.setRole.mockResolvedValue(true);
+      User.findById.mockResolvedValue(mockUpdatedUser); // Mock findById after setRole
       auditService.log.mockResolvedValue(true);
 
       // Act

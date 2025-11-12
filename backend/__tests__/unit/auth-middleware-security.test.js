@@ -6,8 +6,21 @@
 const request = require("supertest");
 const express = require("express");
 const jwt = require("jsonwebtoken");
-const { authenticateToken, requireAdmin } = require("../../middleware/auth");
+const { authenticateToken, requireMinimumRole } = require("../../middleware/auth");
 const AppConfig = require("../../config/app-config");
+const { mockUserDataServiceFindOrCreateUser } = require("../mocks/services.mock");
+
+// Mock the UserDataService
+jest.mock("../../services/user-data", () => ({
+  UserDataService: {
+    findOrCreateUser: jest.fn(),
+    getUserByAuth0Id: jest.fn(),
+    getAllUsers: jest.fn(),
+    isConfigMode: jest.fn(),
+  },
+}));
+
+const { UserDataService } = require("../../services/user-data");
 
 describe("Authentication Middleware - Security", () => {
   let app;
@@ -27,7 +40,7 @@ describe("Authentication Middleware - Security", () => {
     });
 
     // Test endpoint that requires admin role
-    app.get("/api/admin", authenticateToken, requireAdmin, (req, res) => {
+    app.get("/api/admin", authenticateToken, requireMinimumRole("admin"), (req, res) => {
       res.json({ success: true, message: "Admin access granted" });
     });
   });
@@ -107,6 +120,20 @@ describe("Authentication Middleware - Security", () => {
 
   describe("Auth0 Token Handling", () => {
     test("should accept auth0 token in any environment", async () => {
+      // Mock UserDataService to return a valid user
+      const mockUser = {
+        id: 1,
+        auth0_id: "auth0|12345",
+        email: "user@auth0.com",
+        first_name: "Test",
+        last_name: "User",
+        role: "technician",
+        is_active: true,
+        provider: "auth0",
+        name: "Test User",
+      };
+      mockUserDataServiceFindOrCreateUser(UserDataService, mockUser);
+
       const token = jwt.sign(
         {
           sub: "auth0|12345",
@@ -124,6 +151,7 @@ describe("Authentication Middleware - Security", () => {
 
       expect(response.status).toBe(200);
       expect(response.body.user.provider).toBe("auth0");
+      expect(UserDataService.findOrCreateUser).toHaveBeenCalledTimes(1);
     });
   });
 

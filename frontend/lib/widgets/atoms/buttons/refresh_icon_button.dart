@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../config/constants.dart';
+import '../../../config/app_spacing.dart';
 
 class RefreshIconButton extends StatelessWidget {
   final VoidCallback onPressed;
@@ -7,8 +7,9 @@ class RefreshIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final spacing = context.spacing;
     return IconButton(
-      icon: Icon(Icons.refresh, size: StyleConstants.iconSizeSmall),
+      icon: Icon(Icons.refresh, size: spacing.iconSizeSM),
       tooltip: 'Refresh',
       onPressed: onPressed,
       padding: EdgeInsets.zero,

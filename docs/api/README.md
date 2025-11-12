@@ -450,11 +450,12 @@ openapi-generator-cli generate -i docs/api/openapi.json -g java -o clients/java
 
 - **Swagger UI:** http://localhost:3001/api-docs (when server running)
 - **OpenAPI Spec:** [docs/api/openapi.json](./openapi.json)
-- **Testing Guide:** [docs/TESTING_GUIDE.md](../TESTING_GUIDE.md)
-- **Auth Guide:** [docs/AUTH_GUIDE.md](../AUTH_GUIDE.md)
+- **Testing Guide:** [docs/testing/TESTING_GUIDE.md](../testing/TESTING_GUIDE.md)
+- **Auth Guide:** [docs/auth/AUTH_GUIDE.md](../auth/AUTH_GUIDE.md)
 
 ---
 
-**Last Updated:** October 17, 2025  
-**API Version:** 1.0.0  
-**Status:** Production Ready ✅
+---
+
+**TrossApp API Documentation** - RESTful API reference with comprehensive examples
+

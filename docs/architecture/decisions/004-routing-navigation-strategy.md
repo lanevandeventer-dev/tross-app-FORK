@@ -1,7 +1,6 @@
 # ADR 004: Routing & Navigation Strategy
 
 **Status:** Accepted  
-**Date:** 2025-10-27  
 **Decision Makers:** Development Team  
 **Outcome:** Imperative Navigation with Programmatic Guards
 
@@ -402,9 +401,3 @@ final router = GoRouter(
 - [Navigator 2.0 Documentation](https://docs.flutter.dev/development/ui/navigation/deep-linking)
 - Internal: `frontend/lib/core/routes.dart` (implementation)
 - Internal: `frontend/test/core/routes_test.dart` (validation tests)
-
----
-
-**Last Updated:** 2025-10-27  
-**Review Cycle:** Annually or when routing complexity increases  
-**Next Review:** 2026-10-27

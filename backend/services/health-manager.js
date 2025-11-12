@@ -3,8 +3,8 @@
  * KISS principle: Each service stands alone, degrades gracefully
  */
 
-const { logger } = require("../config/logger");
-const { ENVIRONMENTS } = require("../config/constants");
+const { logger } = require('../config/logger');
+const { ENVIRONMENTS: _ENVIRONMENTS } = require('../config/constants');
 
 class HealthManager {
   constructor() {
@@ -25,7 +25,7 @@ class HealthManager {
       name,
       healthCheck: healthCheckFn,
       required,
-      status: "unknown",
+      status: 'unknown',
       lastCheck: null,
       lastError: null,
     });
@@ -37,24 +37,24 @@ class HealthManager {
   async checkService(serviceName) {
     const service = this.services.get(serviceName);
     if (!service) {
-      return { status: "unknown", error: "Service not registered" };
+      return { status: 'unknown', error: 'Service not registered' };
     }
 
     try {
       const result = await Promise.race([
         service.healthCheck(),
         new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("Health check timeout")), 5000),
+          setTimeout(() => reject(new Error('Health check timeout')), 5000),
         ),
       ]);
 
-      service.status = "healthy";
+      service.status = 'healthy';
       service.lastCheck = new Date().toISOString();
       service.lastError = null;
 
-      return { status: "healthy", ...result };
+      return { status: 'healthy', ...result };
     } catch (error) {
-      service.status = "unhealthy";
+      service.status = 'unhealthy';
       service.lastCheck = new Date().toISOString();
       service.lastError = error.message;
 
@@ -65,7 +65,7 @@ class HealthManager {
       });
 
       return {
-        status: "unhealthy",
+        status: 'unhealthy',
         error: error.message,
         required: service.required,
       };
@@ -98,29 +98,29 @@ class HealthManager {
       (s) => s.required,
     );
     const requiredHealthy = requiredServices.every(
-      (s) => s.status === "healthy",
+      (s) => s.status === 'healthy',
     );
 
-    const allHealthy = Array.from(this.services.values()).every(
-      (s) => s.status === "healthy",
+    const _allHealthy = Array.from(this.services.values()).every(
+      (s) => s.status === 'healthy',
     );
     const hasUnhealthy = Array.from(this.services.values()).some(
-      (s) => s.status === "unhealthy",
+      (s) => s.status === 'unhealthy',
     );
 
-    let overallStatus = "healthy";
+    let overallStatus = 'healthy';
     if (!requiredHealthy) {
-      overallStatus = "critical"; // Required services down
+      overallStatus = 'critical'; // Required services down
     } else if (hasUnhealthy) {
-      overallStatus = "degraded"; // Optional services down
+      overallStatus = 'degraded'; // Optional services down
     }
 
     return {
       status: overallStatus,
       timestamp: new Date().toISOString(),
       uptime: Math.floor((Date.now() - this.startTime) / 1000),
-      environment: process.env.NODE_ENV || "development",
-      version: "1.0.0",
+      environment: process.env.NODE_ENV || 'development',
+      version: '1.0.0',
       services: serviceResults,
       memory: {
         used:
@@ -144,7 +144,7 @@ class HealthManager {
   async getServiceStatus(serviceName) {
     if (!this.services.has(serviceName)) {
       return {
-        status: "unknown",
+        status: 'unknown',
         error: `Service '${serviceName}' not found`,
         available_services: Array.from(this.services.keys()),
       };
@@ -166,26 +166,26 @@ const defaultHealthChecks = {
   database: async () => {
     // This should NOT crash the server if DB is down
     try {
-      const db = require("../db/connection");
-      await db.query("SELECT 1");
-      return { database: "connected", type: "PostgreSQL" };
+      const db = require('../db/connection');
+      await db.query('SELECT 1');
+      return { database: 'connected', type: 'PostgreSQL' };
     } catch (error) {
       // Database down is OK - we can work without it
       return {
-        database: "disconnected",
+        database: 'disconnected',
         error: error.message,
-        mode: "standalone",
+        mode: 'standalone',
       };
     }
   },
 
   filesystem: async () => {
-    const fs = require("fs").promises;
+    const fs = require('fs').promises;
     try {
-      await fs.access("logs");
-      return { filesystem: "accessible" };
+      await fs.access('logs');
+      return { filesystem: 'accessible' };
     } catch (error) {
-      return { filesystem: "limited", error: error.message };
+      return { filesystem: 'limited', error: error.message };
     }
   },
 
@@ -198,7 +198,7 @@ const defaultHealthChecks = {
       throw new Error(`High memory usage: ${Math.round(used)}MB`);
     }
 
-    return { memory: `${Math.round(used)}MB`, status: "normal" };
+    return { memory: `${Math.round(used)}MB`, status: 'normal' };
   },
 };
 
@@ -206,13 +206,13 @@ const defaultHealthChecks = {
 const healthManager = new HealthManager();
 
 // Register default services (none are required for basic operation)
-healthManager.registerService("database", defaultHealthChecks.database, false);
+healthManager.registerService('database', defaultHealthChecks.database, false);
 healthManager.registerService(
-  "filesystem",
+  'filesystem',
   defaultHealthChecks.filesystem,
   false,
 );
-healthManager.registerService("memory", defaultHealthChecks.memory, false);
+healthManager.registerService('memory', defaultHealthChecks.memory, false);
 
 module.exports = {
   healthManager,

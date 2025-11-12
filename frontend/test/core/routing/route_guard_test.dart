@@ -355,16 +355,20 @@ void main() {
       expect(result.redirectRoute, equals(AppRoutes.unauthorized));
     });
 
-    test('case-sensitive role checking', () {
+    test('case-insensitive role checking (matches backend)', () {
       final result = RouteGuard.checkAccess(
         route: AppRoutes.admin,
         isAuthenticated: true,
-        user: {'role': 'Admin'}, // Capital A
+        user: {'role': 'Admin'}, // Capital A - should work (case-insensitive)
       );
 
-      // Should fail because role checking is case-sensitive
-      expect(result.canAccess, isFalse);
-      expect(result.redirectRoute, equals(AppRoutes.unauthorized));
+      // Should PASS because role checking is case-insensitive (like backend)
+      expect(
+        result.canAccess,
+        isTrue,
+        reason:
+            'Role checking should be case-insensitive to match backend behavior',
+      );
     });
   });
 }

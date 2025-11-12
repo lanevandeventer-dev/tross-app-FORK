@@ -1,7 +1,6 @@
 # ADR 003: Auth0 for Authentication
 
 **Status:** ✅ Accepted  
-**Date:** October 2025  
 **Deciders:** Development Team
 
 ---
@@ -286,7 +285,7 @@ class Auth0Config {
 - ✅ `AuthService`: 100% coverage
 - ✅ `Auth0PlatformService`: 100% coverage
 - ✅ Token management: Fully tested
-- ✅ E2E auth flows: 13 tests passing
+- ✅ E2E auth flows: Comprehensive coverage
 
 ---
 

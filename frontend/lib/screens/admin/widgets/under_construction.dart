@@ -5,6 +5,8 @@
 library;
 
 import 'package:flutter/material.dart';
+import '../../../config/app_spacing.dart';
+import '../../../config/app_colors.dart';
 
 class UnderConstruction extends StatelessWidget {
   final String title;
@@ -22,6 +24,8 @@ class UnderConstruction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final spacing = context.spacing;
+
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 800),
@@ -33,39 +37,39 @@ class UnderConstruction extends StatelessWidget {
           },
           child: Card(
             elevation: 4,
-            color: const Color(0xFFFFB90F).withValues(alpha: 0.1),
+            color: AppColors.brandSecondary.withValues(alpha: 0.1),
             child: Padding(
-              padding: const EdgeInsets.all(32.0),
+              padding: EdgeInsets.all(spacing.xl),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   // Construction Icon
                   Container(
-                    padding: const EdgeInsets.all(24),
+                    padding: EdgeInsets.all(spacing.lg),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFFB90F).withValues(alpha: 0.2),
+                      color: AppColors.brandSecondary.withValues(alpha: 0.2),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(
                       Icons.construction,
                       size: 64,
-                      color: Color(0xFFCD7F32), // Bronze
+                      color: AppColors.brandPrimary,
                     ),
                   ),
 
-                  const SizedBox(height: 24),
+                  SizedBox(height: spacing.lg),
 
                   // Title
                   Text(
                     title,
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: const Color(0xFFCD7F32), // Bronze
+                      color: AppColors.brandPrimary,
                     ),
                     textAlign: TextAlign.center,
                   ),
 
-                  const SizedBox(height: 16),
+                  SizedBox(height: spacing.md),
 
                   // Message
                   if (message != null)
@@ -75,7 +79,7 @@ class UnderConstruction extends StatelessWidget {
                       textAlign: TextAlign.center,
                     ),
 
-                  const SizedBox(height: 32),
+                  SizedBox(height: spacing.xl),
 
                   // Progress Indicator
                   LinearProgressIndicator(
@@ -83,12 +87,12 @@ class UnderConstruction extends StatelessWidget {
                       context,
                     ).colorScheme.surfaceContainerHighest,
                     valueColor: const AlwaysStoppedAnimation<Color>(
-                      Color(0xFFCD7F32), // Bronze
+                      AppColors.brandPrimary,
                     ),
                   ),
 
                   if (phase != null) ...[
-                    const SizedBox(height: 8),
+                    SizedBox(height: spacing.xs),
                     Text(
                       phase!,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -98,15 +102,15 @@ class UnderConstruction extends StatelessWidget {
                   ],
 
                   if (onBack != null) ...[
-                    const SizedBox(height: 24),
+                    SizedBox(height: spacing.lg),
                     OutlinedButton.icon(
                       onPressed: onBack,
                       icon: const Icon(Icons.arrow_back),
                       label: const Text('Go Back'),
                       style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 12,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: spacing.lg,
+                          vertical: spacing.sm,
                         ),
                       ),
                     ),

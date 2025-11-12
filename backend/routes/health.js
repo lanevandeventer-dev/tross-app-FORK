@@ -4,11 +4,11 @@
  * Endpoints for monitoring system and database health
  */
 
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const db = require("../db/connection");
-const { authenticateToken, requireAdmin } = require("../middleware/auth");
-const { logger } = require("../config/logger");
+const db = require('../db/connection');
+const { authenticateToken, requireMinimumRole } = require('../middleware/auth');
+const { logger } = require('../config/logger');
 
 /**
  * @openapi
@@ -55,20 +55,20 @@ const { logger } = require("../config/logger");
  *                   type: string
  *                   description: Error message
  */
-router.get("/", async (req, res) => {
+router.get('/', async (req, res) => {
   try {
     // Check database connectivity
-    await db.raw("SELECT 1");
+    await db.raw('SELECT 1');
 
     res.json({
-      status: "healthy",
+      status: 'healthy',
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
     });
   } catch (error) {
-    logger.error("Health check failed:", error);
+    logger.error('Health check failed:', error);
     res.status(503).json({
-      status: "unhealthy",
+      status: 'unhealthy',
       timestamp: new Date().toISOString(),
       error: error.message,
     });
@@ -137,7 +137,7 @@ router.get("/", async (req, res) => {
  *       500:
  *         description: Failed to retrieve database health
  */
-router.get("/databases", authenticateToken, requireAdmin, async (req, res) => {
+router.get('/databases', authenticateToken, requireMinimumRole('admin'), async (req, res) => {
   try {
     const databases = [];
 
@@ -148,7 +148,7 @@ router.get("/databases", authenticateToken, requireAdmin, async (req, res) => {
       const poolStats = db.pool;
 
       // Test query
-      await db.query("SELECT 1");
+      await db.query('SELECT 1');
       const responseTime = Date.now() - mainDbStart;
 
       // Get active connections count (pg Pool API)
@@ -156,27 +156,27 @@ router.get("/databases", authenticateToken, requireAdmin, async (req, res) => {
       const maxConnections = poolStats.options?.max || 10;
 
       // Determine health status based on response time and connection usage
-      let status = "healthy";
+      let status = 'healthy';
       let errorMessage = null;
 
       if (responseTime > 500) {
-        status = "critical";
+        status = 'critical';
         errorMessage = `Slow response time: ${responseTime}ms`;
       } else if (responseTime > 100) {
-        status = "degraded";
+        status = 'degraded';
         errorMessage = `Elevated response time: ${responseTime}ms`;
       }
 
       if (connectionCount / maxConnections > 0.8) {
         status =
-          connectionCount / maxConnections > 0.95 ? "critical" : "degraded";
+          connectionCount / maxConnections > 0.95 ? 'critical' : 'degraded';
         errorMessage = errorMessage
           ? `${errorMessage}. High connection usage: ${connectionCount}/${maxConnections}`
           : `High connection usage: ${connectionCount}/${maxConnections}`;
       }
 
       databases.push({
-        name: "PostgreSQL (Main)",
+        name: 'PostgreSQL (Main)',
         status,
         responseTime,
         connectionCount,
@@ -185,10 +185,10 @@ router.get("/databases", authenticateToken, requireAdmin, async (req, res) => {
         errorMessage,
       });
     } catch (error) {
-      logger.error("Main database health check failed:", error);
+      logger.error('Main database health check failed:', error);
       databases.push({
-        name: "PostgreSQL (Main)",
-        status: "critical",
+        name: 'PostgreSQL (Main)',
+        status: 'critical',
         responseTime: Date.now() - mainDbStart,
         connectionCount: 0,
         maxConnections: 0,
@@ -202,9 +202,9 @@ router.get("/databases", authenticateToken, requireAdmin, async (req, res) => {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    logger.error("Database health check failed:", error);
+    logger.error('Database health check failed:', error);
     res.status(500).json({
-      error: "Failed to retrieve database health",
+      error: 'Failed to retrieve database health',
       message: error.message,
     });
   }

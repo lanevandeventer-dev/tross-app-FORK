@@ -9,7 +9,6 @@
 const request = require("supertest");
 const app = require("../../../server");
 const {
-  setupTestDatabase,
   cleanupTestDatabase,
   createTestUser,
   uniqueEmail,
@@ -33,8 +32,8 @@ describe("User Role Assignment - Integration Tests", () => {
   let managerRoleId;
   let dispatcherRoleId;
 
+  // STANDARD PATTERN: globalSetup handles schema, beforeAll creates test users
   beforeAll(async () => {
-    // Database already set up by global setup
     const adminData = await createTestUser("admin");
     adminToken = adminData.token;
     adminUser = adminData.user;
@@ -60,6 +59,7 @@ describe("User Role Assignment - Integration Tests", () => {
     testUserId = userResponse.body.data.id;
   });
 
+  // STANDARD PATTERN: Clean data after all tests
   afterAll(async () => {
     await cleanupTestDatabase();
   });

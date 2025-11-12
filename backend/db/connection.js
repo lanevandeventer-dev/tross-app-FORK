@@ -1,12 +1,13 @@
 // Database connection and pool management
-const { Pool } = require("pg");
-const { logger } = require("../config/logger");
-const { DATABASE } = require("../config/constants");
-require("dotenv").config();
+const { Pool } = require('pg');
+const { logger } = require('../config/logger');
+const { DATABASE } = require('../config/constants');
+const { TIMEOUTS } = require('../config/timeouts');
+require('dotenv').config();
 
 // Determine which database configuration to use based on environment
-const isTest = process.env.NODE_ENV === "test";
-const isDevelopment = process.env.NODE_ENV === "development";
+const isTest = process.env.NODE_ENV === 'test';
+const isDevelopment = process.env.NODE_ENV === 'development';
 
 // Test database configuration (port 5433, separate from default on 5432)
 // Uses constants.js for single source of truth
@@ -20,11 +21,11 @@ const testDbConfig = {
   // Test pool configuration (smaller, faster cleanup)
   max: DATABASE.TEST.POOL.MAX,
   min: DATABASE.TEST.POOL.MIN,
-  idleTimeoutMillis: DATABASE.TEST.POOL.IDLE_TIMEOUT_MS,
-  connectionTimeoutMillis: DATABASE.TEST.POOL.CONNECTION_TIMEOUT_MS,
-  statement_timeout: 10000,
-  query_timeout: 10000,
-  application_name: "trossapp_test",
+  idleTimeoutMillis: TIMEOUTS.DATABASE.TEST.IDLE_TIMEOUT_MS,
+  connectionTimeoutMillis: TIMEOUTS.DATABASE.TEST.CONNECTION_TIMEOUT_MS,
+  statement_timeout: TIMEOUTS.DATABASE.TEST.STATEMENT_TIMEOUT_MS,
+  query_timeout: TIMEOUTS.DATABASE.TEST.QUERY_TIMEOUT_MS,
+  application_name: 'trossapp_test',
 };
 
 // Default database configuration (standard PostgreSQL port 5432)
@@ -41,11 +42,11 @@ const defaultDbConfig = {
   // Default pool configuration (optimized for performance)
   max: DATABASE.DEV.POOL.MAX,
   min: DATABASE.DEV.POOL.MIN,
-  idleTimeoutMillis: DATABASE.DEV.POOL.IDLE_TIMEOUT_MS,
-  connectionTimeoutMillis: DATABASE.DEV.POOL.CONNECTION_TIMEOUT_MS,
-  statement_timeout: 30000,
-  query_timeout: 30000,
-  application_name: "trossapp_backend",
+  idleTimeoutMillis: TIMEOUTS.DATABASE.IDLE_TIMEOUT_MS,
+  connectionTimeoutMillis: TIMEOUTS.DATABASE.CONNECTION_TIMEOUT_MS,
+  statement_timeout: TIMEOUTS.DATABASE.STATEMENT_TIMEOUT_MS,
+  query_timeout: TIMEOUTS.DATABASE.QUERY_TIMEOUT_MS,
+  application_name: 'trossapp_backend',
 };
 
 // Create connection pool with appropriate configuration
@@ -54,19 +55,19 @@ const pool = new Pool(poolConfig);
 
 // Log which database we're connecting to (environment + database name)
 if (isTest) {
-  logger.info("🧪 Using TEST database", {
+  logger.info('🧪 Using TEST database', {
     host: poolConfig.host,
     port: poolConfig.port,
     database: poolConfig.database,
   });
 } else if (isDevelopment) {
-  logger.info("🔧 Using DEVELOPMENT database", {
+  logger.info('🔧 Using DEVELOPMENT database', {
     host: poolConfig.host,
     port: poolConfig.port,
     database: poolConfig.database,
   });
 } else {
-  logger.info("� Using PRODUCTION database", {
+  logger.info('� Using PRODUCTION database', {
     host: poolConfig.host,
     port: poolConfig.port,
     database: poolConfig.database,
@@ -74,20 +75,20 @@ if (isTest) {
 }
 
 // Comprehensive pool event logging and error handling
-pool.on("connect", (client) => {
-  logger.debug("New database client connected to pool");
+pool.on('connect', (_client) => {
+  logger.debug('New database client connected to pool');
 });
 
-pool.on("acquire", (client) => {
-  logger.debug("Client acquired from pool");
+pool.on('acquire', (_client) => {
+  logger.debug('Client acquired from pool');
 });
 
-pool.on("remove", (client) => {
-  logger.debug("Client removed from pool");
+pool.on('remove', (_client) => {
+  logger.debug('Client removed from pool');
 });
 
-pool.on("error", (err, client) => {
-  logger.error("Unexpected error on idle database client:", err);
+pool.on('error', (err, _client) => {
+  logger.error('Unexpected error on idle database client:', err);
   // Don't exit process - let application handle gracefully
 });
 
@@ -100,7 +101,7 @@ const query = async (text, params) => {
     logger.debug(`Query executed in ${duration}ms`);
     return result;
   } catch (error) {
-    logger.error("Query error:", { error: error.message, query: text });
+    logger.error('Query error:', { error: error.message, query: text });
     throw error;
   }
 };
@@ -113,12 +114,12 @@ const testConnection = async (retries = 3, delay = 1000) => {
     try {
       const client = await pool.connect();
       const result = await client.query(
-        "SELECT NOW() as current_time, version() as postgres_version",
+        'SELECT NOW() as current_time, version() as postgres_version',
       );
       client.release();
-      logger.info("✅ Database connection successful", {
+      logger.info('✅ Database connection successful', {
         timestamp: result.rows[0].current_time,
-        version: result.rows[0].postgres_version.split(" ")[0],
+        version: result.rows[0].postgres_version.split(' ')[0],
       });
       return true;
     } catch (error) {
@@ -148,10 +149,10 @@ const testConnection = async (retries = 3, delay = 1000) => {
 const closePool = async () => {
   try {
     await pool.end();
-    logger.info("✅ Database pool closed gracefully");
+    logger.info('✅ Database pool closed gracefully');
     return true;
   } catch (err) {
-    logger.error("❌ Error closing database pool:", err.message);
+    logger.error('❌ Error closing database pool:', err.message);
     return false;
   }
 };

@@ -4,18 +4,23 @@
  * Closes database connections to prevent hanging
  */
 
-const { teardownTestDatabase } = require("../helpers/test-db");
 const testLogger = require("../../config/test-logger");
 
 module.exports = async () => {
-  testLogger.log("🧹 Global teardown: Closing test database connections...");
+  testLogger.log("🧹 Global teardown: Cleaning up...");
 
   try {
-    await teardownTestDatabase();
-    testLogger.log("✅ Test database connections closed");
+    // Import the pool here to close connections made during tests
+    const { pool } = require("../../db/connection");
+    
+    if (pool && pool.totalCount > 0) {
+      await pool.end();
+      testLogger.log("✅ Test database connections closed");
+    }
+    
     testLogger.log("✅ TrossApp integration test suite completed");
   } catch (error) {
-    testLogger.error("❌ Global teardown failed:", error.message);
+    testLogger.error("❌ Global teardown error:", error.message);
     // Don't throw - allow Jest to exit gracefully
   }
 };

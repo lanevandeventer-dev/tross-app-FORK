@@ -10,7 +10,7 @@ import 'screens/home_screen.dart';
 import 'screens/admin/admin_dashboard.dart';
 import 'screens/settings/settings_screen.dart';
 import 'widgets/organisms/error_display.dart';
-import 'widgets/molecules/error_action_buttons.dart'; // For ErrorAction
+import 'widgets/molecules/buttons/error_action_compat.dart';
 import 'providers/auth_provider.dart';
 import 'providers/app_provider.dart';
 import 'core/routing/app_routes.dart';
@@ -18,8 +18,19 @@ import 'core/routing/route_guard.dart';
 import 'config/constants.dart';
 import 'config/app_theme.dart';
 import 'services/error_service.dart';
+import 'services/permission_service_dynamic.dart';
+import 'config/validation_rules.dart';
 
-void main() {
+void main() async {
+  // Ensure Flutter bindings are initialized before async operations
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize data-driven permission system
+  await PermissionService.initialize();
+
+  // Initialize centralized validation rules
+  await ValidationRules.load();
+
   // ============================================================================
   // FLUTTER GLOBAL ERROR HANDLING
   // ============================================================================

@@ -7,11 +7,11 @@
 const AUTH0_CONFIG = {
   // Required Environment Variables for Production
   REQUIRED_ENV: [
-    "AUTH0_DOMAIN", // Your Auth0 domain (e.g., 'your-app.auth0.com')
-    "AUTH0_CLIENT_ID", // Auth0 application client ID
-    "AUTH0_CLIENT_SECRET", // Auth0 application client secret
-    "AUTH0_AUDIENCE", // Auth0 API identifier (optional)
-    "AUTH0_CALLBACK_URL", // Auth0 callback URL after login
+    'AUTH0_DOMAIN', // Your Auth0 domain (e.g., 'your-app.auth0.com')
+    'AUTH0_CLIENT_ID', // Auth0 application client ID
+    'AUTH0_CLIENT_SECRET', // Auth0 application client secret
+    'AUTH0_AUDIENCE', // Auth0 API identifier (optional)
+    'AUTH0_CALLBACK_URL', // Auth0 callback URL after login
   ],
 
   // Auth0 Tenant Configuration
@@ -19,42 +19,42 @@ const AUTH0_CONFIG = {
     domain: process.env.AUTH0_DOMAIN,
     clientId: process.env.AUTH0_CLIENT_ID,
     clientSecret: process.env.AUTH0_CLIENT_SECRET,
-    audience: process.env.AUTH0_AUDIENCE || `https://api.trossapp.com`,
+    audience: process.env.AUTH0_AUDIENCE || 'https://api.trossapp.com',
     callbackUrl:
       process.env.AUTH0_CALLBACK_URL ||
-      "http://localhost:3001/api/auth/callback",
+      'http://localhost:3001/api/auth/callback',
   },
 
   // JWT Configuration for Auth0
   JWT: {
-    algorithm: "RS256",
+    algorithm: 'RS256',
     issuer: process.env.AUTH0_DOMAIN
       ? `https://${process.env.AUTH0_DOMAIN}/`
       : null,
-    audience: process.env.AUTH0_AUDIENCE || `https://api.trossapp.com`,
+    audience: process.env.AUTH0_AUDIENCE || 'https://api.trossapp.com',
   },
 
   // Auth0 API Endpoints
   ENDPOINTS: {
-    token: "/oauth/token",
-    userinfo: "/userinfo",
-    logout: "/v2/logout",
-    jwks: "/.well-known/jwks.json",
+    token: '/oauth/token',
+    userinfo: '/userinfo',
+    logout: '/v2/logout',
+    jwks: '/.well-known/jwks.json',
   },
 
   // Auth0 Scopes
   SCOPES: {
-    openid: "openid",
-    profile: "profile",
-    email: "email",
-    offline_access: "offline_access", // For refresh tokens
+    openid: 'openid',
+    profile: 'profile',
+    email: 'email',
+    offline_access: 'offline_access', // For refresh tokens
   },
 
   // Grant Types
   GRANT_TYPES: {
-    authorization_code: "authorization_code",
-    refresh_token: "refresh_token",
-    client_credentials: "client_credentials",
+    authorization_code: 'authorization_code',
+    refresh_token: 'refresh_token',
+    client_credentials: 'client_credentials',
   },
 };
 
@@ -62,7 +62,7 @@ const AUTH0_CONFIG = {
  * Validate Auth0 configuration
  * @returns {Object} Validation result
  */
-function validateAuth0Config() {
+function _validateAuth0Config() {
   const missing = AUTH0_CONFIG.REQUIRED_ENV.filter((key) => !process.env[key]);
 
   return {
@@ -77,34 +77,34 @@ function validateAuth0Config() {
  * @param {string} environment - Environment name (development, staging, production)
  * @returns {Object} Environment-specific configuration
  */
-function getAuth0Config(environment = "production") {
+function _getAuth0Config(environment = 'production') {
   const baseConfig = { ...AUTH0_CONFIG };
 
   switch (environment) {
-    case "development":
+    case 'development':
       return {
         ...baseConfig,
         TENANT: {
           ...baseConfig.TENANT,
-          callbackUrl: "http://localhost:3001/api/auth/callback",
+          callbackUrl: 'http://localhost:3001/api/auth/callback',
         },
       };
 
-    case "staging":
+    case 'staging':
       return {
         ...baseConfig,
         TENANT: {
           ...baseConfig.TENANT,
-          callbackUrl: "https://staging-api.trossapp.com/api/auth/callback",
+          callbackUrl: 'https://staging-api.trossapp.com/api/auth/callback',
         },
       };
 
-    case "production":
+    case 'production':
       return {
         ...baseConfig,
         TENANT: {
           ...baseConfig.TENANT,
-          callbackUrl: "https://api.trossapp.com/api/auth/callback",
+          callbackUrl: 'https://api.trossapp.com/api/auth/callback',
         },
       };
 

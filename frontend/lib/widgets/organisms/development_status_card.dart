@@ -8,6 +8,8 @@ import 'package:flutter/material.dart';
 import '../../config/app_spacing.dart';
 import '../../config/app_colors.dart';
 import '../../services/environment_service.dart';
+import '../../utils/helpers/health_helper.dart';
+import '../../utils/helpers/string_helper.dart';
 import '../molecules/dashboard_card.dart';
 
 class DevelopmentStatusCard extends StatefulWidget {
@@ -231,9 +233,11 @@ class _DevelopmentStatusCardState extends State<DevelopmentStatusCard> {
                     _buildInfoRow(
                       context,
                       'API Health',
-                      _envInfo!.apiHealth.toUpperCase(),
+                      StringHelper.toUpperCase(_envInfo!.apiHealth),
                       Icons.favorite,
-                      valueColor: _getHealthColor(_envInfo!.apiHealth),
+                      valueColor: HealthHelper.getColorForStatus(
+                        _envInfo!.apiHealth,
+                      ),
                     ),
                     if (_envInfo!.databaseStatus != null)
                       _buildInfoRow(
@@ -276,32 +280,6 @@ class _DevelopmentStatusCardState extends State<DevelopmentStatusCard> {
     );
   }
 
-  Color _getHealthColor(String health) {
-    switch (health.toLowerCase()) {
-      case 'healthy':
-        return AppColors.success;
-      case 'degraded':
-        return AppColors.warning;
-      case 'critical':
-        return AppColors.error;
-      default:
-        return AppColors.textSecondary;
-    }
-  }
-
-  IconData _getHealthIcon(String health) {
-    switch (health.toLowerCase()) {
-      case 'healthy':
-        return Icons.check_circle;
-      case 'degraded':
-        return Icons.warning;
-      case 'critical':
-        return Icons.error;
-      default:
-        return Icons.help_outline;
-    }
-  }
-
   Widget _buildInfoRow(
     BuildContext context,
     String label,
@@ -315,7 +293,9 @@ class _DevelopmentStatusCardState extends State<DevelopmentStatusCard> {
 
     // Enhanced styling for health status
     final isHealthRow = label == 'API Health';
-    final healthIcon = isHealthRow ? _getHealthIcon(value) : null;
+    final healthIcon = isHealthRow
+        ? HealthHelper.getIconForStatus(value)
+        : null;
 
     return Container(
       margin: EdgeInsets.only(bottom: isLast ? 0 : spacing.sm),
@@ -359,14 +339,14 @@ class _DevelopmentStatusCardState extends State<DevelopmentStatusCard> {
           ),
           SizedBox(width: spacing.sm),
           // Value with optional health icon
-          Expanded(
+          Flexible(
             child: Row(
               children: [
                 if (healthIcon != null) ...[
                   Icon(healthIcon, size: 16, color: valueColor),
                   SizedBox(width: spacing.xs),
                 ],
-                Expanded(
+                Flexible(
                   child: Text(
                     value,
                     style: theme.textTheme.bodyMedium?.copyWith(

@@ -10,7 +10,7 @@
 const request = require("supertest");
 const Role = require("../../../db/models/Role");
 const auditService = require("../../../services/audit-service");
-const { authenticateToken, requireAdmin } = require("../../../middleware/auth");
+const { authenticateToken, requirePermission } = require("../../../middleware/auth");
 const {
   validateRoleCreate,
   validateRoleUpdate,
@@ -27,7 +27,11 @@ const {
 // Mock dependencies
 jest.mock("../../../db/models/Role");
 jest.mock("../../../services/audit-service");
-jest.mock("../../../middleware/auth");
+jest.mock("../../../middleware/auth", () => ({
+  authenticateToken: jest.fn((req, res, next) => next()),
+  requirePermission: jest.fn(() => (req, res, next) => next()),
+  requireMinimumRole: jest.fn(() => (req, res, next) => next()),
+}));
 jest.mock("../../../utils/request-helpers");
 
 // Mock validators with proper factory functions that return middleware
@@ -37,9 +41,24 @@ jest.mock("../../../validators", () => ({
     req.validated.pagination = { page: 1, limit: 50, offset: 0 };
     next();
   }),
+  validateQuery: jest.fn(() => (req, res, next) => {
+    // Mock metadata-driven query validation
+    if (!req.validated) req.validated = {};
+    if (!req.validated.query) req.validated.query = {};
+    req.validated.query.search = req.query.search;
+    req.validated.query.filters = req.query.filters || {};
+    req.validated.query.sortBy = req.query.sortBy;
+    req.validated.query.sortOrder = req.query.sortOrder;
+    next();
+  }),
   validateIdParam: jest.fn(() => (req, res, next) => {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id) || id < 1) {
+      return res.status(400).json({ error: "Invalid ID" });
+    }
     req.validated = req.validated || {};
-    req.validated.id = parseInt(req.params.id, 10) || null;
+    req.validated.id = id;
+    req.validatedId = id;
     next();
   }),
   validateRoleCreate: jest.fn((req, res, next) => next()),
@@ -57,7 +76,7 @@ describe("routes/roles.js - CRUD Operations", () => {
       getClientIp,
       getUserAgent,
       authenticateToken,
-      requireAdmin,
+      requirePermission,
       validateIdParam,
       validateRoleCreate,
       validateRoleUpdate,
@@ -70,17 +89,27 @@ describe("routes/roles.js - CRUD Operations", () => {
   });
 
   // ===========================
-  // GET /api/roles - List All Roles
+  // GET /api/roles - List All Roles (Paginated)
   // ===========================
   describe("GET /api/roles", () => {
-    test("should return all roles with count and timestamp", async () => {
+    test("should return paginated roles with count and timestamp", async () => {
       // Arrange
       const mockRoles = [
         { id: 1, name: "admin", created_at: "2025-10-17T16:52:17.841Z" },
         { id: 2, name: "client", created_at: "2025-10-17T16:52:17.841Z" },
         { id: 3, name: "manager", created_at: "2025-10-17T16:52:17.841Z" },
       ];
-      Role.findAll.mockResolvedValue(mockRoles);
+      Role.findAll.mockResolvedValue({
+        data: mockRoles,
+        pagination: {
+          page: 1,
+          limit: 50,
+          total: 3,
+          totalPages: 1,
+          hasNext: false,
+          hasPrev: false,
+        },
+      });
 
       // Act
       const response = await request(app).get("/api/roles");
@@ -90,13 +119,25 @@ describe("routes/roles.js - CRUD Operations", () => {
       expect(response.body.success).toBe(true);
       expect(response.body.data).toEqual(mockRoles);
       expect(response.body.count).toBe(3);
+      expect(response.body.pagination).toBeDefined();
+      expect(response.body.pagination.total).toBe(3);
       expect(response.body.timestamp).toBeDefined();
       expect(Role.findAll).toHaveBeenCalledTimes(1);
     });
 
     test("should return empty array when no roles exist", async () => {
       // Arrange
-      Role.findAll.mockResolvedValue([]);
+      Role.findAll.mockResolvedValue({
+        data: [],
+        pagination: {
+          page: 1,
+          limit: 50,
+          total: 0,
+          totalPages: 1,
+          hasNext: false,
+          hasPrev: false,
+        },
+      });
 
       // Act
       const response = await request(app).get("/api/roles");
@@ -108,22 +149,35 @@ describe("routes/roles.js - CRUD Operations", () => {
       expect(response.body.count).toBe(0);
     });
 
-    test("should handle very large result sets", async () => {
-      // Arrange
-      const largeRoleSet = Array.from({ length: 1000 }, (_, i) => ({
+    test("should handle very large result sets with pagination", async () => {
+      // Arrange - Now with pagination, only returns 50 at a time
+      const firstPage = Array.from({ length: 50 }, (_, i) => ({
         id: i + 1,
         name: `role${i}`,
         created_at: new Date(),
       }));
-      Role.findAll.mockResolvedValue(largeRoleSet);
+      Role.findAll.mockResolvedValue({
+        data: firstPage,
+        pagination: {
+          page: 1,
+          limit: 50,
+          total: 1000,
+          totalPages: 20,
+          hasNext: true,
+          hasPrev: false,
+        },
+      });
 
       // Act
       const response = await request(app).get("/api/roles");
 
       // Assert
       expect(response.status).toBe(200);
-      expect(response.body.count).toBe(1000);
-      expect(response.body.data).toHaveLength(1000);
+      expect(response.body.count).toBe(50); // First page only
+      expect(response.body.data).toHaveLength(50);
+      expect(response.body.pagination.total).toBe(1000);
+      expect(response.body.pagination.totalPages).toBe(20);
+      expect(response.body.pagination.hasNext).toBe(true);
     });
   });
 
@@ -152,15 +206,12 @@ describe("routes/roles.js - CRUD Operations", () => {
     });
 
     test("should handle non-numeric ID gracefully", async () => {
-      // Arrange
-      Role.findById.mockResolvedValue(null);
-
-      // Act
+      // Act - validator returns 400 for invalid ID format
       const response = await request(app).get("/api/roles/abc");
 
       // Assert
-      expect(response.status).toBe(404);
-      expect(Role.findById).toHaveBeenCalledWith(null); // Validator returns null for invalid ID
+      expect(response.status).toBe(400);
+      expect(response.body).toHaveProperty("error");
     });
   });
 
@@ -258,7 +309,7 @@ describe("routes/roles.js - CRUD Operations", () => {
       expect(response.body.message).toBe("Role updated successfully");
 
       expect(Role.findById).toHaveBeenCalledWith(3);
-      expect(Role.update).toHaveBeenCalledWith(3, "supervisor");
+      expect(Role.update).toHaveBeenCalledWith(3, { name: "supervisor" });
       expect(auditService.log).toHaveBeenCalledWith({
         userId: 1,
         action: "role_update",
@@ -283,12 +334,7 @@ describe("routes/roles.js - CRUD Operations", () => {
       Role.update.mockResolvedValue(updatedRole);
       auditService.log.mockResolvedValue(undefined);
 
-      validateIdParam.mockImplementation((req, res, next) => {
-        req.validatedId = parseInt(req.params.id);
-        next();
-      });
-
-      // Act
+      // Act - validateIdParam mock now sets both req.validated.id and req.validatedId
       const response = await request(app)
         .put("/api/roles/5")
         .send({ name: "senior-analyst" });
@@ -296,7 +342,7 @@ describe("routes/roles.js - CRUD Operations", () => {
       // Assert
       expect(response.status).toBe(200);
       expect(Role.findById).toHaveBeenCalledWith(5);
-      expect(Role.update).toHaveBeenCalledWith(5, "senior-analyst");
+      expect(Role.update).toHaveBeenCalledWith(5, { name: "senior-analyst" });
     });
   });
 

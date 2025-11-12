@@ -2,8 +2,7 @@
 
 **Flutter web/mobile application for work order management**
 
-[![Flutter](https://img.shields.io/badge/Flutter-3.35.6-blue.svg)](https://flutter.dev/)
-[![Tests](https://img.shields.io/badge/Tests-625%20passing-green.svg)](#testing)
+[![Flutter](https://img.shields.io/badge/Flutter-3.x-blue.svg)](https://flutter.dev/)
 
 ---
 
@@ -16,7 +15,7 @@ Cross-platform frontend for TrossApp built with Flutter, featuring:
 - **Provider State Management** with defensive error handling
 - **Auth0 Integration** supporting web, iOS, and Android
 - **Type-Safe API Client** with auto token refresh
-- **Comprehensive Test Suite** (625 tests, 99% coverage)
+- **Comprehensive Test Coverage** across all layers
 
 ---
 
@@ -153,7 +152,7 @@ flutter run -d chrome
 ### 3. Run Tests
 
 ```bash
-# All 625 tests
+# All tests
 flutter test
 
 # With coverage
@@ -180,10 +179,8 @@ flutter build ios --release
 
 ## 🧪 Testing
 
-**Current Status:** ✅ **625/625 tests passing**
-
 ```bash
-# Run all tests (fast, ~15 seconds)
+# Run all tests
 flutter test --reporter=compact
 
 # Run with coverage visualization
@@ -198,13 +195,14 @@ flutter test test/widgets/            # Widget tests
 flutter test test/e2e/                # End-to-end tests
 ```
 
-**Test Coverage Highlights:**
+**Testing Philosophy:**
 
-- Providers: 100% coverage (auth, app state)
-- Services: 100% coverage (API, auth, user, role)
-- Models: 100% defensive validation tested
-- E2E: 13 complete user journey tests
-- Concurrent: 18 tests for 50-200 concurrent operations
+- Comprehensive coverage across all layers
+- Providers: State management and defensive error handling
+- Services: API client functionality and auth flows
+- Models: Defensive validation patterns
+- E2E: Complete user journey validation
+- Concurrency: Multi-operation stress testing
 
 View detailed coverage: `frontend/coverage/COVERAGE_ANALYSIS.md`
 

@@ -8,10 +8,20 @@
  */
 
 // Mock dependencies BEFORE requiring the module
-jest.mock("../../../db/connection");
-jest.mock("../../../config/logger");
+jest.mock("../../../db/connection", () => ({
+  query: jest.fn(),
+}));
 
-const { pool } = require("../../../db/connection");
+jest.mock("../../../config/logger", () => ({
+  logger: {
+    info: jest.fn(),
+    error: jest.fn(),
+    warn: jest.fn(),
+    debug: jest.fn(),
+  },
+}));
+
+const db = require("../../../db/connection");
 const { logger } = require("../../../config/logger");
 const auditService = require("../../../services/audit-service");
 const {
@@ -25,17 +35,17 @@ describe("services/audit-service.js - Validation & Error Handling", () => {
     jest.clearAllMocks();
 
     // Mock logger methods
-    logger.info = jest.fn();
-    logger.error = jest.fn();
+    logger.info.mockImplementation(() => {});
+    logger.error.mockImplementation(() => {});
 
-    // Mock pool.query by default
-    pool.query = jest.fn().mockResolvedValue({ rows: [], rowCount: 0 });
+    // Mock db.query by default
+    db.query.mockResolvedValue({ rows: [], rowCount: 0 });
   });
 
   describe("log() - Error Handling", () => {
     test("should handle database errors gracefully without throwing", async () => {
       // Arrange
-      pool.query.mockRejectedValue(new Error("Database connection failed"));
+      db.query.mockRejectedValue(new Error("Database connection failed"));
 
       // Act & Assert - should not throw
       await expect(
@@ -60,7 +70,7 @@ describe("services/audit-service.js - Validation & Error Handling", () => {
   describe("getUserAuditTrail() - Error Handling", () => {
     test("should handle database errors", async () => {
       // Arrange
-      pool.query.mockRejectedValue(new Error("Connection timeout"));
+      db.query.mockRejectedValue(new Error("Connection timeout"));
 
       // Act & Assert
       await expect(auditService.getUserAuditTrail(1)).rejects.toThrow(
@@ -75,7 +85,7 @@ describe("services/audit-service.js - Validation & Error Handling", () => {
 
     test("should return empty array when no logs found", async () => {
       // Arrange
-      pool.query.mockResolvedValue({ rows: [] });
+      db.query.mockResolvedValue({ rows: [] });
 
       // Act
       const result = await auditService.getUserAuditTrail(999);
@@ -88,7 +98,7 @@ describe("services/audit-service.js - Validation & Error Handling", () => {
   describe("getSecurityEvents() - Error Handling", () => {
     test("should handle database errors", async () => {
       // Arrange
-      pool.query.mockRejectedValue(new Error("Query failed"));
+      db.query.mockRejectedValue(new Error("Query failed"));
 
       // Act & Assert
       await expect(auditService.getSecurityEvents()).rejects.toThrow(
@@ -105,7 +115,7 @@ describe("services/audit-service.js - Validation & Error Handling", () => {
   describe("getResourceAuditTrail() - Error Handling", () => {
     test("should handle database errors", async () => {
       // Arrange
-      pool.query.mockRejectedValue(new Error("Database error"));
+      db.query.mockRejectedValue(new Error("Database error"));
 
       // Act & Assert
       await expect(
@@ -124,7 +134,7 @@ describe("services/audit-service.js - Validation & Error Handling", () => {
 
     test("should return empty array when no logs found", async () => {
       // Arrange
-      pool.query.mockResolvedValue({ rows: [] });
+      db.query.mockResolvedValue({ rows: [] });
 
       // Act
       const result = await auditService.getResourceAuditTrail(
@@ -140,7 +150,7 @@ describe("services/audit-service.js - Validation & Error Handling", () => {
   describe("getFailedLoginAttempts() - Error Handling", () => {
     test("should return 0 on database error (fail open)", async () => {
       // Arrange
-      pool.query.mockRejectedValue(new Error("Database unavailable"));
+      db.query.mockRejectedValue(new Error("Database unavailable"));
 
       // Act
       const result = await auditService.getFailedLoginAttempts("1.1.1.1");
@@ -158,7 +168,7 @@ describe("services/audit-service.js - Validation & Error Handling", () => {
 
     test("should return 0 when no attempts found", async () => {
       // Arrange
-      pool.query.mockResolvedValue({ rows: [{ count: "0" }] });
+      db.query.mockResolvedValue({ rows: [{ count: "0" }] });
 
       // Act
       const result = await auditService.getFailedLoginAttempts("8.8.8.8");
@@ -171,7 +181,7 @@ describe("services/audit-service.js - Validation & Error Handling", () => {
   describe("cleanupOldLogs() - Error Handling", () => {
     test("should handle database errors", async () => {
       // Arrange
-      pool.query.mockRejectedValue(new Error("DELETE failed"));
+      db.query.mockRejectedValue(new Error("DELETE failed"));
 
       // Act & Assert
       await expect(auditService.cleanupOldLogs(90)).rejects.toThrow(

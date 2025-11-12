@@ -9,26 +9,15 @@
 /// ConnectionStatusBadge(status: HealthStatus.degraded, label: 'Database')
 /// ConnectionStatusBadge(status: HealthStatus.critical, showLabel: false)
 /// ```
+///
+/// Note: HealthStatus enum is defined in models/database_health.dart for
+/// proper separation of concerns (models should not depend on widgets).
 library;
 
 import 'package:flutter/material.dart';
 import '../../../config/app_spacing.dart';
 import '../../../config/app_colors.dart';
-
-/// Health/Connection status states
-enum HealthStatus {
-  /// Service is fully operational
-  healthy,
-
-  /// Service is operational but degraded (slow, partial failure)
-  degraded,
-
-  /// Service is not operational
-  critical,
-
-  /// Status is unknown (loading, not yet checked)
-  unknown,
-}
+import '../../../models/database_health.dart'; // Import HealthStatus from model
 
 /// Atomic component for displaying health/connection status
 class ConnectionStatusBadge extends StatelessWidget {

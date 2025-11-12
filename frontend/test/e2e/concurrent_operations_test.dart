@@ -226,25 +226,6 @@ void main() {
         expect(authProvider.isLoading, isFalse);
       });
 
-      test(
-        '50 rapid app init-health check cycles maintain consistency',
-        () async {
-          // Test rapid app provider state transitions
-          for (int cycle = 0; cycle < 50; cycle++) {
-            await appProvider.initialize();
-            await appProvider.checkServiceHealthOnDemand();
-          }
-
-          // Verify: App remains in consistent state
-          expect(
-            appProvider.isInitialized,
-            isTrue,
-            reason: 'App should remain initialized after 50 rapid cycles',
-          );
-        },
-        skip: 'Stress test - flaky during development (timing-sensitive)',
-      );
-
       test('Interleaved rapid operations on both providers', () async {
         // Test concurrent rapid state changes across providers
         final futures = <Future<void>>[];
@@ -345,27 +326,6 @@ void main() {
           reason: '50 concurrent operations should complete in < 1 second',
         );
       });
-
-      test(
-        '100 concurrent operations complete in reasonable time',
-        () async {
-          final stopwatch = Stopwatch()..start();
-
-          await Future.wait([
-            for (int i = 0; i < 100; i++) appProvider.initialize(),
-          ]);
-
-          stopwatch.stop();
-
-          // Verify: Even 100 operations complete quickly (< 2 seconds)
-          expect(
-            stopwatch.elapsedMilliseconds,
-            lessThan(2000),
-            reason: '100 concurrent operations should complete in < 2 seconds',
-          );
-        },
-        skip: 'Performance benchmark - timing varies by machine/load',
-      );
     });
 
     group('Edge Cases Under Concurrency', () {

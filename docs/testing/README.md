@@ -324,10 +324,4 @@ open coverage/lcov-report/index.html
 - [Jest Documentation](https://jestjs.io/)
 - [Supertest GitHub](https://github.com/visionmedia/supertest)
 - [Testing Best Practices](https://github.com/goldbergyoni/javascript-testing-best-practices)
-- [TrossApp Testing Roadmap](../COMPREHENSIVE_PROJECT_ANALYSIS.md)
-
----
-
-**Last Updated:** January 14, 2025  
-**Current Status:** 20 tests, expanding to 113+ tests  
-**Maintainer:** TrossApp Team
+- [TrossApp Architecture](../architecture/)

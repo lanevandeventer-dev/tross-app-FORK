@@ -3,21 +3,21 @@
  * KISS principle: Essential logging only
  */
 
-const winston = require("winston");
+const winston = require('winston');
 
 // Log levels: error, warn, info, debug
-const logLevel = process.env.LOG_LEVEL || "info";
-const isDevelopment = process.env.NODE_ENV !== "production";
+const logLevel = process.env.LOG_LEVEL || 'info';
+const isDevelopment = process.env.NODE_ENV !== 'production';
 
 // Simple, clean format for development - KISS!
 const prettyFormat = winston.format.printf(
-  ({ level, message, timestamp, ...metadata }) => {
+  ({ _level, message, timestamp, ...metadata }) => {
     // Clean, minimal format: timestamp + message
     let msg = `${timestamp} ${message}`;
 
     // Only show important metadata (skip noise like userAgent, ip for routine requests)
     const importantMeta = {};
-    const skipKeys = ["timestamp", "level", "message", "userAgent", "ip"];
+    const skipKeys = ['timestamp', 'level', 'message', 'userAgent', 'ip'];
 
     Object.keys(metadata).forEach((key) => {
       if (!skipKeys.includes(key) && metadata[key] !== undefined) {
@@ -38,7 +38,7 @@ const prettyFormat = winston.format.printf(
 const logger = winston.createLogger({
   level: logLevel,
   format: winston.format.combine(
-    winston.format.timestamp({ format: "HH:mm:ss" }),
+    winston.format.timestamp({ format: 'HH:mm:ss' }),
     winston.format.errors({ stack: true }),
     isDevelopment ? prettyFormat : winston.format.json(),
   ),
@@ -47,10 +47,10 @@ const logger = winston.createLogger({
     new winston.transports.Console({
       format: isDevelopment
         ? winston.format.combine(
-            winston.format.colorize({ all: true }),
-            winston.format.timestamp({ format: "HH:mm:ss" }),
-            prettyFormat,
-          )
+          winston.format.colorize({ all: true }),
+          winston.format.timestamp({ format: 'HH:mm:ss' }),
+          prettyFormat,
+        )
         : winston.format.json(),
     }),
   ],
@@ -60,14 +60,14 @@ const logger = winston.createLogger({
 if (!isDevelopment) {
   logger.add(
     new winston.transports.File({
-      filename: "logs/error.log",
-      level: "error",
+      filename: 'logs/error.log',
+      level: 'error',
     }),
   );
 
   logger.add(
     new winston.transports.File({
-      filename: "logs/combined.log",
+      filename: 'logs/combined.log',
     }),
   );
 }
@@ -78,11 +78,11 @@ if (!isDevelopment) {
 const requestLogger = (req, res, next) => {
   const start = Date.now();
 
-  res.on("finish", () => {
+  res.on('finish', () => {
     const duration = Date.now() - start;
 
     // Skip noisy OPTIONS requests in dev
-    if (isDevelopment && req.method === "OPTIONS") {
+    if (isDevelopment && req.method === 'OPTIONS') {
       return;
     }
 
@@ -105,7 +105,7 @@ const requestLogger = (req, res, next) => {
  * Log security events
  */
 const logSecurityEvent = (event, details = {}) => {
-  logger.warn("Security Event", {
+  logger.warn('Security Event', {
     event,
     timestamp: new Date().toISOString(),
     ...details,

@@ -31,7 +31,7 @@ class ErrorMessage extends StatelessWidget {
           textAlign: textAlign ?? TextAlign.center,
         ),
         SizedBox(height: spacing.sm),
-        Text(
+        SelectableText(
           description,
           style: theme.textTheme.bodyLarge,
           textAlign: textAlign ?? TextAlign.center,

@@ -152,6 +152,11 @@ ehthumbs.db
 Thumbs.db
 desktop.ini
 
+# Windows artifacts (redirect/pipe artifacts)
+nul
+curl
+trossapp@*
+
 # Temporary/junk files
 _ul
 */_ul

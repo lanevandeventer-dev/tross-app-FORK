@@ -7,10 +7,12 @@ import '../../config/app_colors.dart';
 import '../../config/constants.dart';
 import '../../core/routing/app_routes.dart';
 import '../../providers/auth_provider.dart';
+import '../../services/navigation_coordinator.dart';
 import '../atoms/icons/error_icon.dart';
 import '../atoms/text/error_code_text.dart';
 import '../molecules/error_message.dart';
-import '../molecules/error_action_buttons.dart';
+import '../molecules/buttons/error_action_compat.dart';
+import '../molecules/buttons/button_group.dart';
 
 /// Error Display - Single, flexible, data-driven error UI
 ///
@@ -193,10 +195,10 @@ class ErrorDisplay extends StatelessWidget {
                   // Title + Description (molecule)
                   ErrorMessage(title: title, description: description),
 
-                  // Optional: Requested Path
+                  // Optional: Requested Path (selectable)
                   if (requestedPath != null) ...[
                     SizedBox(height: spacing.md),
-                    Text(
+                    SelectableText(
                       'Path: $requestedPath',
                       style: theme.textTheme.bodySmall?.copyWith(
                         fontFamily: 'monospace',
@@ -226,8 +228,27 @@ class ErrorDisplay extends StatelessWidget {
 
                   SizedBox(height: spacing.xl),
 
-                  // Action Buttons (molecule) - dynamically built based on auth
-                  ErrorActionButtons(actions: builtActions),
+                  // Action Buttons - convert ErrorActions to ButtonConfigs
+                  // Organism handles async/navigation, molecule just renders
+                  ButtonGroup.horizontal(
+                    buttons: builtActions
+                        .map(
+                          (action) => action.toButtonConfig(
+                            onTap: () async {
+                              if (action.route != null) {
+                                NavigationCoordinator.navigateTo(
+                                  context,
+                                  action.route!,
+                                );
+                              } else if (action.onPressed != null) {
+                                await action.onPressed!(context);
+                              }
+                            },
+                          ),
+                        )
+                        .toList(),
+                    alignment: MainAxisAlignment.center,
+                  ),
                 ],
               );
             },

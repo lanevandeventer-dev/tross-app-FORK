@@ -1,10 +1,10 @@
 // User Data Service - Handles both config-based and database-based user data
-const { TEST_USERS } = require("../config/test-users");
+const { TEST_USERS } = require('../config/test-users');
 
 class UserDataService {
   constructor() {
-    this.useTestAuth = process.env.USE_TEST_AUTH === "true";
-    this.isDevelopment = process.env.NODE_ENV === "development";
+    this.useTestAuth = process.env.USE_TEST_AUTH === 'true';
+    this.isDevelopment = process.env.NODE_ENV === 'development';
   }
 
   // Get all users - config or database based
@@ -24,8 +24,9 @@ class UserDataService {
       }));
     } else {
       // Use database
-      const User = require("../db/models/User");
-      return await User.getAll();
+      const User = require('../db/models/User');
+      const result = await User.findAll({ includeInactive: false });
+      return result.data; // Extract data array from paginated response
     }
   }
 
@@ -52,8 +53,8 @@ class UserDataService {
       return null;
     } else {
       // Use database
-      const User = require("../db/models/User");
-      return await User.findByAuth0Id(auth0Id);
+      const User = require('../db/models/User');
+      return User.findByAuth0Id(auth0Id);
     }
   }
 
@@ -64,8 +65,8 @@ class UserDataService {
       return this.getUserByAuth0Id(auth0Data.sub);
     } else {
       // Use database
-      const User = require("../db/models/User");
-      return await User.findOrCreate(auth0Data);
+      const User = require('../db/models/User');
+      return User.findOrCreate(auth0Data);
     }
   }
 

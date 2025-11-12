@@ -37,44 +37,18 @@ class StatusBadge extends StatelessWidget {
     this.compact = false,
   });
 
-  /// Factory constructor for role badges
-  factory StatusBadge.role(String roleName) {
-    final normalized = roleName.toLowerCase();
-    BadgeStyle style;
-    IconData icon;
-
-    switch (normalized) {
-      case 'admin':
-        style = BadgeStyle.admin;
-        icon = Icons.admin_panel_settings;
-        break;
-      case 'technician':
-        style = BadgeStyle.technician;
-        icon = Icons.build;
-        break;
-      case 'manager':
-        style = BadgeStyle.manager;
-        icon = Icons.business_center;
-        break;
-      case 'dispatcher':
-        style = BadgeStyle.dispatcher;
-        icon = Icons.route;
-        break;
-      case 'client':
-        style = BadgeStyle.client;
-        icon = Icons.person;
-        break;
-      default:
-        style = BadgeStyle.neutral;
-        icon = Icons.label;
-    }
-
-    return StatusBadge(
-      label: roleName[0].toUpperCase() + roleName.substring(1),
-      style: style,
-      icon: icon,
-    );
-  }
+  // ✅ REMOVED: StatusBadge.role() factory - domain-specific logic
+  // Routes/configs should map role → BadgeStyle + icon as DATA
+  // Example usage in route config:
+  //   final roleBadgeConfig = {
+  //     'admin': (BadgeStyle.admin, Icons.admin_panel_settings),
+  //     'technician': (BadgeStyle.technician, Icons.build),
+  //   };
+  //   StatusBadge(
+  //     label: user.role,
+  //     style: roleBadgeConfig[user.role].$1,
+  //     icon: roleBadgeConfig[user.role].$2,
+  //   )
 
   @override
   Widget build(BuildContext context) {
@@ -104,17 +78,21 @@ class StatusBadge extends StatelessWidget {
             ),
             SizedBox(width: compact ? spacing.xxs : spacing.xs),
           ],
-          Text(
-            label,
-            style:
-                (compact
-                        ? theme.textTheme.labelSmall
-                        : theme.textTheme.labelMedium)
-                    ?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: colors.text,
-                      letterSpacing: 0.3,
-                    ),
+          Flexible(
+            child: Text(
+              label,
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+              style:
+                  (compact
+                          ? theme.textTheme.labelSmall
+                          : theme.textTheme.labelMedium)
+                      ?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: colors.text,
+                        letterSpacing: 0.3,
+                      ),
+            ),
           ),
         ],
       ),

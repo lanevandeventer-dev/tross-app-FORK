@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../config/constants.dart';
+import '../../config/app_spacing.dart';
 import '../atoms/buttons/refresh_icon_button.dart';
 
 class HealthStatusBox extends StatelessWidget {
@@ -17,41 +17,43 @@ class HealthStatusBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final spacing = context.spacing;
+    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
+            // Title and subtitle (flexible, not expanded - no context assumption)
+            Flexible(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     'Database Health',
-                    style: StyleConstants.healthBoxTitleStyle,
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   if (subtitle != null)
-                    Text(
-                      subtitle!,
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
+                    Text(subtitle!, style: theme.textTheme.bodySmall),
                 ],
               ),
             ),
+            SizedBox(width: spacing.xs),
+            // Refresh button
             isRefreshing
-                ? const SizedBox(
-                    width: 24,
-                    height: 24,
+                ? SizedBox(
+                    width: spacing.lg,
+                    height: spacing.lg,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : RefreshIconButton(onPressed: onRefresh),
           ],
         ),
-        if (child != null) ...[
-          SizedBox(height: StyleConstants.healthBoxSpacing),
-          child!,
-        ],
+        if (child != null) ...[SizedBox(height: spacing.md), child!],
       ],
     );
   }

@@ -7,6 +7,7 @@
     "test": "jest",
     "test:unit": "jest --config jest.config.unit.json",
     "test:integration": "jest --config jest.config.integration.json",
+    "test:all": "jest",
     "dev": "node server.js",
     "start": "node server.js",
     "health": "node scripts/test-db-connection.js",
@@ -16,7 +17,9 @@
     "test:watch:integration": "jest --watch --config jest.config.integration.json",
     "test:coverage": "jest --coverage --config jest.config.integration.json",
     "test:coverage:unit": "jest --coverage --config jest.config.unit.json",
-    "seed:admin": "node scripts/seed-admin-user.js"
+    "seed:admin": "node scripts/seed-admin-user.js",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
   },
   "keywords": [],
   "author": "",
@@ -26,31 +29,23 @@
     "auth0": "^4.32.0",
     "axios": "^1.12.2",
     "bcrypt": "^6.0.0",
-    "connect-redis": "^7.1.1",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "express-mongo-sanitize": "^2.2.0",
     "express-rate-limit": "^8.1.0",
-    "express-session": "^1.18.2",
-    "express-validator": "^7.2.1",
     "helmet": "^8.1.0",
     "joi": "^18.0.1",
     "jsonwebtoken": "^9.0.2",
     "jwks-rsa": "^3.2.0",
-    "morgan": "^1.10.1",
     "pg": "^8.16.3",
-    "redis": "^4.7.1",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
     "uuid": "^13.0.0",
     "winston": "^3.18.3"
   },
   "devDependencies": {
-    "@types/jest": "^30.0.0",
-    "@types/node": "^24.6.0",
     "jest": "^30.2.0",
-    "nodemon": "^3.1.10",
     "supertest": "^7.1.4"
   }
 }

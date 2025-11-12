@@ -4,11 +4,11 @@
  * ALWAYS uses DevAuthStrategy - independent of AUTH_MODE.
  * This allows dev login buttons to work alongside Auth0.
  */
-const express = require("express");
-const DevAuthStrategy = require("../services/auth/DevAuthStrategy");
-const User = require("../db/models/User");
-const { HTTP_STATUS } = require("../config/constants");
-const { logger } = require("../config/logger");
+const express = require('express');
+const DevAuthStrategy = require('../services/auth/DevAuthStrategy');
+const _User = require('../db/models/User');
+const { HTTP_STATUS } = require('../config/constants');
+const { logger } = require('../config/logger');
 
 const router = express.Router();
 
@@ -20,11 +20,22 @@ const devStrategy = new DevAuthStrategy();
  * /api/dev/token:
  *   get:
  *     tags: [Development]
- *     summary: Generate test token (technician role)
+ *     summary: Generate test token (any role)
  *     description: |
- *       Generate a JWT token for testing with technician role.
+ *       Generate a JWT token for testing with any role.
  *       **DEVELOPMENT ONLY** - Always available regardless of AUTH_MODE.
  *       Token is valid for 24 hours.
+ *
+ *       Supports all roles: admin, manager, dispatcher, technician, client.
+ *       Defaults to technician if no role specified (backward compatible).
+ *     parameters:
+ *       - in: query
+ *         name: role
+ *         schema:
+ *           type: string
+ *           enum: [admin, manager, dispatcher, technician, client]
+ *         required: false
+ *         description: Role for the test token (defaults to technician)
  *     responses:
  *       200:
  *         description: Test token generated
@@ -60,15 +71,31 @@ const devStrategy = new DevAuthStrategy();
  *                 timestamp:
  *                   type: string
  *                   format: date-time
+ *       400:
+ *         description: Invalid role specified
  */
-router.get("/token", async (req, res) => {
+router.get('/token', async (req, res) => {
   try {
+    // Get role from query param, default to technician (backward compatible)
+    const requestedRole = req.query.role || 'technician';
+
+    // Validate role (must be one of the 5 defined roles)
+    const validRoles = ['admin', 'manager', 'dispatcher', 'technician', 'client'];
+    if (!validRoles.includes(requestedRole)) {
+      return res.status(HTTP_STATUS.BAD_REQUEST).json({
+        success: false,
+        error: 'Invalid role',
+        message: `Role must be one of: ${validRoles.join(', ')}`,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
     // Use dev strategy directly - always works regardless of AUTH_MODE
     const { token, user } = await devStrategy.authenticate({
-      role: "technician",
+      role: requestedRole,
     });
 
-    logger.info("🔧 Dev token generated for technician");
+    logger.info(`🔧 Dev auth: Generated token for ${user.email} (${user.role})`);
 
     res.json({
       success: true,
@@ -76,19 +103,20 @@ router.get("/token", async (req, res) => {
       user: {
         auth0_id: user.auth0_id,
         email: user.email,
-        name: user.first_name + " " + user.last_name,
+        name: user.first_name + ' ' + user.last_name,
         role: user.role,
       },
-      provider: "development",
+      provider: 'development',
       expires_in: 86400, // 24 hours (dev tokens are long-lived for convenience)
-      instructions: "Use this token in Authorization header: Bearer <token>",
+      instructions: 'Use this token in Authorization header: Bearer <token>',
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    logger.error("Failed to generate test token:", error);
+    logger.error('Failed to generate test token:', error);
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
-      error: "Failed to generate test token",
+      error: 'Failed to generate test token',
       message: error.message,
+      timestamp: new Date().toISOString(),
     });
   }
 });
@@ -98,8 +126,12 @@ router.get("/token", async (req, res) => {
  * /api/dev/admin-token:
  *   get:
  *     tags: [Development]
- *     summary: Generate test token (admin role)
+ *     summary: "[DEPRECATED] Generate test token (admin role)"
+ *     deprecated: true
  *     description: |
+ *       **DEPRECATED:** Use `/api/dev/token?role=admin` instead.
+ *
+ *       This endpoint is maintained for backward compatibility only.
  *       Generate a JWT token for testing with admin role.
  *       **DEVELOPMENT ONLY** - Always available regardless of AUTH_MODE.
  *       Token is valid for 24 hours.
@@ -123,16 +155,19 @@ router.get("/token", async (req, res) => {
  *                   type: integer
  *                 instructions:
  *                   type: string
+ *                 deprecated_warning:
+ *                   type: string
  *                 timestamp:
  *                   type: string
  *                   format: date-time
  */
-router.get("/admin-token", async (req, res) => {
+router.get('/admin-token', async (req, res) => {
   try {
-    // Use dev strategy directly - always works regardless of AUTH_MODE
-    const { token, user } = await devStrategy.authenticate({ role: "admin" });
+    // DEPRECATED: Redirect to generic endpoint with role param
+    // Kept for backward compatibility only
+    const { token, user } = await devStrategy.authenticate({ role: 'admin' });
 
-    logger.info("🔧 Dev token generated for admin");
+    logger.warn('⚠️  Deprecated endpoint used: /admin-token - use /token?role=admin instead');
 
     res.json({
       success: true,
@@ -140,18 +175,19 @@ router.get("/admin-token", async (req, res) => {
       user: {
         auth0_id: user.auth0_id,
         email: user.email,
-        name: user.first_name + " " + user.last_name,
+        name: user.first_name + ' ' + user.last_name,
         role: user.role,
       },
-      provider: "development",
+      provider: 'development',
       expires_in: 86400, // 24 hours (dev tokens are long-lived for convenience)
-      instructions: "Use this token in Authorization header: Bearer <token>",
+      instructions: 'Use this token in Authorization header: Bearer <token>',
+      deprecated_warning: 'This endpoint is deprecated. Use /api/dev/token?role=admin instead.',
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    logger.error("Failed to generate admin token:", error);
+    logger.error('Failed to generate admin token:', error);
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
-      error: "Failed to generate admin token",
+      error: 'Failed to generate admin token',
       message: error.message,
     });
   }
@@ -194,17 +230,18 @@ router.get("/admin-token", async (req, res) => {
  *                 note:
  *                   type: string
  */
-router.get("/status", (req, res) => {
+router.get('/status', (req, res) => {
   res.json({
     dev_auth_enabled: true,
-    provider: "development",
-    message: "Dev auth always available (independent of AUTH_MODE)",
+    provider: 'development',
+    message: 'Dev auth always available (independent of AUTH_MODE)',
+    supported_roles: ['admin', 'manager', 'dispatcher', 'technician', 'client'],
     available_endpoints: [
-      "GET /api/dev/token - Get test technician token",
-      "GET /api/dev/admin-token - Get test admin token",
-      "GET /api/dev/status - This endpoint",
+      'GET /api/dev/token?role=<role> - Get test token for any role (admin, manager, dispatcher, technician, client)',
+      'GET /api/dev/admin-token - [DEPRECATED] Use /token?role=admin instead',
+      'GET /api/dev/status - This endpoint',
     ],
-    note: "Dev auth works alongside Auth0 - use for testing and internal users",
+    note: 'Dev auth works alongside Auth0 - use for testing and internal users',
   });
 });
 

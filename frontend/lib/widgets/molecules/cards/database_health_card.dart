@@ -24,6 +24,7 @@ import '../../../config/app_spacing.dart';
 import '../../../config/app_colors.dart';
 import '../../../utils/helpers/date_time_helpers.dart';
 import '../../../utils/helpers/color_helpers.dart';
+import '../../../models/database_health.dart';
 import '../../atoms/indicators/connection_status_badge.dart';
 
 /// Molecule component for displaying database health information
@@ -95,8 +96,9 @@ class DatabaseHealthCard extends StatelessWidget {
 
   Widget _buildHeader(ThemeData theme, AppSpacing spacing) {
     return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Expanded(
+        Flexible(
           child: Text(
             databaseName,
             style: theme.textTheme.titleMedium?.copyWith(
@@ -130,7 +132,7 @@ class DatabaseHealthCard extends StatelessWidget {
             size: spacing.iconSizeSM,
           ),
           SizedBox(width: spacing.xs),
-          Expanded(
+          Flexible(
             child: Text(
               errorMessage!,
               style: theme.textTheme.bodySmall?.copyWith(
@@ -148,7 +150,7 @@ class DatabaseHealthCard extends StatelessWidget {
   Widget _buildMetrics(ThemeData theme, AppSpacing spacing) {
     return Row(
       children: [
-        Expanded(
+        Flexible(
           child: _buildMetricItem(
             theme,
             spacing,
@@ -159,7 +161,7 @@ class DatabaseHealthCard extends StatelessWidget {
           ),
         ),
         SizedBox(width: spacing.md),
-        Expanded(
+        Flexible(
           child: _buildMetricItem(
             theme,
             spacing,

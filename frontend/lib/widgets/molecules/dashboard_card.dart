@@ -33,6 +33,7 @@ class DashboardCard extends StatelessWidget {
       elevation: elevation,
       color: color ?? StyleConstants.dbCardColor,
       margin: margin ?? StyleConstants.dbCardMargin,
+      clipBehavior: Clip.antiAlias, // Clip children to rounded corners
       shape: RoundedRectangleBorder(
         borderRadius: StyleConstants.cardBorderRadius,
       ),

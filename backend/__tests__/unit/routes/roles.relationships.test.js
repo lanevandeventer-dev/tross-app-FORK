@@ -9,7 +9,7 @@
 
 const request = require("supertest");
 const Role = require("../../../db/models/Role");
-const { authenticateToken, requireAdmin } = require("../../../middleware/auth");
+const { authenticateToken, requirePermission } = require("../../../middleware/auth");
 const {
   validateRoleCreate,
   validateRoleUpdate,
@@ -25,7 +25,11 @@ const {
 // Mock dependencies
 jest.mock("../../../db/models/Role");
 jest.mock("../../../services/audit-service");
-jest.mock("../../../middleware/auth");
+jest.mock("../../../middleware/auth", () => ({
+  authenticateToken: jest.fn((req, res, next) => next()),
+  requirePermission: jest.fn(() => (req, res, next) => next()),
+  requireMinimumRole: jest.fn(() => (req, res, next) => next()),
+}));
 jest.mock("../../../utils/request-helpers");
 
 // Mock validators with proper factory functions that return middleware
@@ -33,6 +37,16 @@ jest.mock("../../../validators", () => ({
   validatePagination: jest.fn(() => (req, res, next) => {
     if (!req.validated) req.validated = {};
     req.validated.pagination = { page: 1, limit: 50, offset: 0 };
+    next();
+  }),
+  validateQuery: jest.fn(() => (req, res, next) => {
+    // Mock metadata-driven query validation
+    if (!req.validated) req.validated = {};
+    if (!req.validated.query) req.validated.query = {};
+    req.validated.query.search = req.query.search;
+    req.validated.query.filters = req.query.filters || {};
+    req.validated.query.sortBy = req.query.sortBy;
+    req.validated.query.sortOrder = req.query.sortOrder;
     next();
   }),
   validateIdParam: jest.fn(() => (req, res, next) => {
@@ -62,7 +76,7 @@ describe("routes/roles.js - Relationships", () => {
       getClientIp,
       getUserAgent,
       authenticateToken,
-      requireAdmin,
+      requirePermission,
     });
   });
 

@@ -16,14 +16,14 @@ const {
   toSafeUuid,
   toSafeString,
   toSafeEmail,
-} = require("./type-coercion");
+} = require('./type-coercion');
 
 // Export URL param validators
 const {
   validateIdParam,
   validateIdParams,
   validateSlugParam,
-} = require("./param-validators");
+} = require('./param-validators');
 
 // Export query string validators
 const {
@@ -31,14 +31,15 @@ const {
   validateSearch,
   validateSort,
   validateFilters,
-} = require("./query-validators");
+  validateQuery, // NEW: Metadata-driven query validation
+} = require('./query-validators');
 
 // Export logging utilities
 const {
   logValidationFailure,
   logTypeCoercion,
   logValidationSuccess,
-} = require("./validation-logger");
+} = require('./validation-logger');
 
 // Export body validators (request payload validation)
 const {
@@ -47,7 +48,11 @@ const {
   validateRoleAssignment,
   validateRoleCreate,
   validateRoleUpdate,
-} = require("./body-validators");
+  validateAuthCallback,
+  validateAuth0Token,
+  validateAuth0Refresh,
+  validateRefreshToken,
+} = require('./body-validators');
 
 module.exports = {
   // Type Coercion
@@ -69,6 +74,7 @@ module.exports = {
   validateSearch,
   validateSort,
   validateFilters,
+  validateQuery, // NEW: Metadata-driven query validation
 
   // Body Validators (from existing middleware)
   validateUserCreate,
@@ -76,6 +82,10 @@ module.exports = {
   validateRoleAssignment,
   validateRoleCreate,
   validateRoleUpdate,
+  validateAuthCallback,
+  validateAuth0Token,
+  validateAuth0Refresh,
+  validateRefreshToken,
 
   // Logging
   logValidationFailure,

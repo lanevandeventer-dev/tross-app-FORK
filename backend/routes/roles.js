@@ -1,25 +1,29 @@
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const Role = require("../db/models/Role");
-const { authenticateToken, requireAdmin } = require("../middleware/auth");
+const Role = require('../db/models/Role');
+const { authenticateToken, requirePermission } = require('../middleware/auth');
 const {
   validateRoleCreate,
   validateRoleUpdate,
   validateIdParam, // Using centralized validator
   validatePagination, // Query string validation
-} = require("../validators"); // Now from validators/ instead of middleware/
-const auditService = require("../services/audit-service");
-const { HTTP_STATUS } = require("../config/constants");
-const { getClientIp, getUserAgent } = require("../utils/request-helpers");
-const { logger } = require("../config/logger");
+  validateQuery, // NEW: Metadata-driven query validation
+} = require('../validators'); // Now from validators/ instead of middleware/
+const auditService = require('../services/audit-service');
+const { HTTP_STATUS } = require('../config/constants');
+const { getClientIp, getUserAgent } = require('../utils/request-helpers');
+const { logger } = require('../config/logger');
+const roleMetadata = require('../config/models/role-metadata'); // NEW: Role metadata
 
 /**
  * @openapi
  * /api/roles:
  *   get:
  *     tags: [Roles]
- *     summary: List all roles
- *     description: Returns a list of all available roles in the system
+ *     summary: List all roles with search, filters, and sorting
+ *     description: |
+ *       Returns a paginated list of roles with optional search, filtering, and sorting.
+ *       All query parameters are optional and can be combined.
  *     parameters:
  *       - in: query
  *         name: page
@@ -36,6 +40,38 @@ const { logger } = require("../config/logger");
  *           maximum: 200
  *           default: 50
  *         description: Number of items per page
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *           maxLength: 255
+ *         description: |
+ *           Search across name and description (case-insensitive).
+ *           Example: search=admin matches "admin" role, "administrator" role
+ *       - in: query
+ *         name: is_active
+ *         schema:
+ *           type: boolean
+ *         description: Filter by active status (e.g., is_active=true)
+ *       - in: query
+ *         name: priority[gte]
+ *         schema:
+ *           type: integer
+ *         description: Filter by minimum priority (e.g., priority[gte]=50)
+ *       - in: query
+ *         name: sortBy
+ *         schema:
+ *           type: string
+ *           enum: [id, name, priority, created_at, updated_at]
+ *           default: priority
+ *         description: Field to sort by
+ *       - in: query
+ *         name: sortOrder
+ *         schema:
+ *           type: string
+ *           enum: [asc, desc, ASC, DESC]
+ *           default: DESC
+ *         description: Sort order (ascending or descending)
  *     responses:
  *       200:
  *         description: Roles retrieved successfully
@@ -61,41 +97,56 @@ const { logger } = require("../config/logger");
  *                       type: integer
  *                     total:
  *                       type: integer
+ *                 appliedFilters:
+ *                   type: object
+ *                   description: Shows which filters were applied
  *                 timestamp:
  *                   type: string
  *                   format: date-time
  *       400:
- *         description: Invalid pagination parameters
+ *         description: Invalid query parameters
  *       500:
  *         description: Server error
  */
-router.get("/", validatePagination(), async (req, res) => {
-  try {
-    // For now, return all roles (pagination ready for future use)
-    // TODO: Implement Role.findAllPaginated(page, limit) when needed
-    const roles = await Role.findAll();
-    const { page, limit } = req.validated.pagination;
+router.get(
+  '/',
+  authenticateToken,
+  requirePermission('roles', 'read'),
+  validatePagination(),
+  validateQuery(roleMetadata), // NEW: Metadata-driven validation
+  async (req, res) => {
+    try {
+    // Extract validated query params
+      const { page, limit } = req.validated.pagination;
+      const { search, filters, sortBy, sortOrder } = req.validated.query;
 
-    res.json({
-      success: true,
-      data: roles,
-      count: roles.length,
-      pagination: {
+      // Call model with all query options
+      const result = await Role.findAll({
         page,
         limit,
-        total: roles.length,
-      },
-      timestamp: new Date().toISOString(),
-    });
-  } catch (error) {
-    logger.error("Error fetching roles", { error: error.message });
-    res.status(500).json({
-      success: false,
-      error: "Failed to fetch roles",
-      timestamp: new Date().toISOString(),
-    });
-  }
-});
+        search,
+        filters,
+        sortBy,
+        sortOrder,
+      });
+
+      res.json({
+        success: true,
+        data: result.data,
+        count: result.data.length,
+        pagination: result.pagination,
+        appliedFilters: result.appliedFilters, // NEW: Show what filters were applied
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      logger.error('Error fetching roles', { error: error.message });
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch roles',
+        timestamp: new Date().toISOString(),
+      });
+    }
+  });
 
 /**
  * @openapi
@@ -131,36 +182,41 @@ router.get("/", validatePagination(), async (req, res) => {
  *       500:
  *         description: Server error
  */
-router.get("/:id", validateIdParam(), async (req, res) => {
-  try {
-    const roleId = req.validated.id; // From validateIdParam middleware
-    const role = await Role.findById(roleId);
+router.get(
+  '/:id',
+  authenticateToken,
+  requirePermission('roles', 'read'),
+  validateIdParam(),
+  async (req, res) => {
+    try {
+      const roleId = req.validated.id; // From validateIdParam middleware
+      const role = await Role.findById(roleId);
 
-    if (!role) {
-      return res.status(404).json({
+      if (!role) {
+        return res.status(404).json({
+          success: false,
+          error: 'Role not found',
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      res.json({
+        success: true,
+        data: role,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      logger.error('Error fetching role', {
+        error: error.message,
+        roleId: req.validated.id,
+      });
+      res.status(500).json({
         success: false,
-        error: "Role not found",
+        error: 'Failed to fetch role',
         timestamp: new Date().toISOString(),
       });
     }
-
-    res.json({
-      success: true,
-      data: role,
-      timestamp: new Date().toISOString(),
-    });
-  } catch (error) {
-    logger.error("Error fetching role", {
-      error: error.message,
-      roleId: req.validated.id,
-    });
-    res.status(500).json({
-      success: false,
-      error: "Failed to fetch role",
-      timestamp: new Date().toISOString(),
-    });
-  }
-});
+  });
 
 /**
  * @openapi
@@ -227,7 +283,9 @@ router.get("/:id", validateIdParam(), async (req, res) => {
  *         description: Server error
  */
 router.get(
-  "/:id/users",
+  '/:id/users',
+  authenticateToken,
+  requirePermission('users', 'read'),
   validateIdParam(),
   validatePagination(),
   async (req, res) => {
@@ -245,13 +303,13 @@ router.get(
         timestamp: new Date().toISOString(),
       });
     } catch (error) {
-      logger.error("Error fetching users by role", {
+      logger.error('Error fetching users by role', {
         error: error.message,
         roleId: req.validated.id,
       });
       res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
         success: false,
-        error: "Failed to fetch users by role",
+        error: 'Failed to fetch users by role',
         timestamp: new Date().toISOString(),
       });
     }
@@ -307,9 +365,9 @@ router.get(
  *         description: Conflict - Role name already exists
  */
 router.post(
-  "/",
+  '/',
   authenticateToken,
-  requireAdmin,
+  requirePermission('roles', 'create'),
   validateRoleCreate,
   async (req, res) => {
     try {
@@ -319,8 +377,8 @@ router.post(
       if (!name) {
         return res.status(HTTP_STATUS.BAD_REQUEST).json({
           success: false,
-          error: "Bad Request",
-          message: "Role name is required",
+          error: 'Bad Request',
+          message: 'Role name is required',
           timestamp: new Date().toISOString(),
         });
       }
@@ -331,8 +389,8 @@ router.post(
       // Log the creation
       await auditService.log({
         userId: req.dbUser.id,
-        action: "role_create",
-        resourceType: "role",
+        action: 'role_create',
+        resourceType: 'role',
         resourceId: newRole.id,
         newValues: { name: newRole.name },
         ipAddress: getClientIp(req),
@@ -342,19 +400,19 @@ router.post(
       res.status(HTTP_STATUS.CREATED).json({
         success: true,
         data: newRole,
-        message: "Role created successfully",
+        message: 'Role created successfully',
         timestamp: new Date().toISOString(),
       });
     } catch (error) {
-      logger.error("Error creating role", {
+      logger.error('Error creating role', {
         error: error.message,
         roleName: req.body.name,
       });
 
-      if (error.message === "Role name already exists") {
+      if (error.message === 'Role name already exists') {
         return res.status(HTTP_STATUS.CONFLICT).json({
           success: false,
-          error: "Conflict",
+          error: 'Conflict',
           message: error.message,
           timestamp: new Date().toISOString(),
         });
@@ -362,8 +420,8 @@ router.post(
 
       res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
         success: false,
-        error: "Internal Server Error",
-        message: "Failed to create role",
+        error: 'Internal Server Error',
+        message: 'Failed to create role',
         timestamp: new Date().toISOString(),
       });
     }
@@ -376,7 +434,19 @@ router.post(
  *   put:
  *     tags: [Roles]
  *     summary: Update role (admin only)
- *     description: Update role name. Cannot modify protected roles (admin, client). Requires admin privileges.
+ *     description: |
+ *       Update role properties including name, description, permissions, and activation status.
+ *       Cannot modify protected roles (admin, client). Requires admin privileges.
+ *
+ *       **Activation Status Management (Contract v2.0):**
+ *       - Setting `is_active: false` deactivates the role
+ *       - Setting `is_active: true` reactivates the role
+ *       - Deactivated roles prevent role assignment to new users
+ *       - Audit trail tracked in audit_logs table (who/when)
+ *
+ *       **Name Normalization:**
+ *       - Role names are automatically converted to lowercase
+ *       - Whitespace is trimmed
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -392,18 +462,84 @@ router.post(
  *         application/json:
  *           schema:
  *             type: object
- *             required:
- *               - name
+ *             minProperties: 1
  *             properties:
  *               name:
  *                 type: string
- *                 description: New role name (will be converted to lowercase)
+ *                 description: Role name (will be converted to lowercase)
+ *                 pattern: '^[a-z][a-z0-9_]*$'
+ *                 maxLength: 50
  *                 example: supervisor
+ *               description:
+ *                 type: string
+ *                 description: Role description
+ *                 maxLength: 255
+ *                 example: Supervises technicians and manages work orders
+ *               permissions:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: Array of permission strings
+ *                 example: ["users:read", "work_orders:update"]
+ *               is_active:
+ *                 type: boolean
+ *                 description: Role activation status. False = deactivated (cannot be assigned)
+ *                 example: true
+ *           examples:
+ *             updateName:
+ *               summary: Update role name
+ *               value:
+ *                 name: senior_supervisor
+ *             updateMultiple:
+ *               summary: Update multiple fields
+ *               value:
+ *                 name: lead_technician
+ *                 description: Senior technician with team lead responsibilities
+ *                 permissions: ["users:read", "work_orders:create", "work_orders:update"]
+ *             deactivateRole:
+ *               summary: Deactivate a role
+ *               value:
+ *                 is_active: false
+ *             reactivateRole:
+ *               summary: Reactivate a role
+ *               value:
+ *                 is_active: true
  *     responses:
  *       200:
  *         description: Role updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                     name:
+ *                       type: string
+ *                     description:
+ *                       type: string
+ *                       nullable: true
+ *                     permissions:
+ *                       type: array
+ *                       items:
+ *                         type: string
+ *                       nullable: true
+ *                     is_active:
+ *                       type: boolean
+ *                     priority:
+ *                       type: integer
+ *                     created_at:
+ *                       type: string
+ *                       format: date-time
+ *                 message:
+ *                   type: string
  *       400:
- *         description: Bad request - Name required, empty, or protected role
+ *         description: Bad request - Invalid input, empty name, or protected role
  *       401:
  *         description: Unauthorized
  *       403:
@@ -414,38 +550,69 @@ router.post(
  *         description: Conflict - Role name already exists
  */
 router.put(
-  "/:id",
+  '/:id',
   authenticateToken,
-  requireAdmin,
-  validateIdParam,
+  requirePermission('roles', 'update'),
+  validateIdParam(),
   validateRoleUpdate,
   async (req, res) => {
     try {
       const roleId = req.validatedId; // From validateIdParam middleware
-      const { name } = req.body;
+      const { name, description, permissions, is_active, priority } = req.body;
 
-      // Get old role name for audit
+      // Get old role for audit
       const oldRole = await Role.findById(roleId);
       if (!oldRole) {
         return res.status(HTTP_STATUS.NOT_FOUND).json({
           success: false,
-          error: "Role Not Found",
-          message: "Role not found",
+          error: 'Role not found',
+          message: 'Role not found',
           timestamp: new Date().toISOString(),
         });
       }
 
-      // Update role
-      const updatedRole = await Role.update(roleId, name);
+      // Build updates object
+      const updates = {};
+      if (name !== undefined) {updates.name = name;}
+      if (description !== undefined) {updates.description = description;}
+      if (permissions !== undefined) {updates.permissions = permissions;}
+      if (is_active !== undefined) {updates.is_active = is_active;}
+      if (priority !== undefined) {updates.priority = priority;}
 
-      // Log the update
+      // Update role
+      const updatedRole = await Role.update(roleId, updates);
+
+      // Log the update (capture changes)
+      const oldValues = {};
+      const newValues = {};
+      if (name !== undefined && oldRole.name !== updatedRole.name) {
+        oldValues.name = oldRole.name;
+        newValues.name = updatedRole.name;
+      }
+      if (description !== undefined && oldRole.description !== updatedRole.description) {
+        oldValues.description = oldRole.description;
+        newValues.description = updatedRole.description;
+      }
+      if (permissions !== undefined) {
+        oldValues.permissions = oldRole.permissions;
+        newValues.permissions = updatedRole.permissions;
+      }
+      if (is_active !== undefined && oldRole.is_active !== updatedRole.is_active) {
+        oldValues.is_active = oldRole.is_active;
+        newValues.is_active = updatedRole.is_active;
+      }
+      if (priority !== undefined && oldRole.priority !== updatedRole.priority) {
+        oldValues.priority = oldRole.priority;
+        newValues.priority = updatedRole.priority;
+      }
+
       await auditService.log({
         userId: req.dbUser.id,
-        action: "role_update",
-        resourceType: "role",
+        action: 'role_update',
+        resourceType: 'role',
         resourceId: roleId,
-        oldValues: { name: oldRole.name },
-        newValues: { name: updatedRole.name },
+        oldValues,
+        newValues,
         ipAddress: getClientIp(req),
         userAgent: getUserAgent(req),
       });
@@ -453,37 +620,37 @@ router.put(
       res.json({
         success: true,
         data: updatedRole,
-        message: "Role updated successfully",
+        message: 'Role updated successfully',
         timestamp: new Date().toISOString(),
       });
     } catch (error) {
-      logger.error("Error updating role", {
+      logger.error('Error updating role', {
         error: error.message,
         roleId: req.params.id,
       });
 
-      if (error.message === "Cannot modify protected role") {
+      if (error.message === 'Cannot modify protected role') {
         return res.status(HTTP_STATUS.BAD_REQUEST).json({
           success: false,
-          error: "Bad Request",
+          error: 'Bad Request',
           message: error.message,
           timestamp: new Date().toISOString(),
         });
       }
 
-      if (error.message === "Role name already exists") {
+      if (error.message === 'Role name already exists') {
         return res.status(HTTP_STATUS.CONFLICT).json({
           success: false,
-          error: "Conflict",
+          error: 'Conflict',
           message: error.message,
           timestamp: new Date().toISOString(),
         });
       }
 
-      if (error.message === "Role not found") {
+      if (error.message === 'Role not found') {
         return res.status(HTTP_STATUS.NOT_FOUND).json({
           success: false,
-          error: "Role Not Found",
+          error: 'Role not found',
           message: error.message,
           timestamp: new Date().toISOString(),
         });
@@ -491,8 +658,8 @@ router.put(
 
       res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
         success: false,
-        error: "Internal Server Error",
-        message: "Failed to update role",
+        error: 'Internal Server Error',
+        message: 'Failed to update role',
         timestamp: new Date().toISOString(),
       });
     }
@@ -540,9 +707,9 @@ router.put(
  *         description: Role not found
  */
 router.delete(
-  "/:id",
+  '/:id',
   authenticateToken,
-  requireAdmin,
+  requirePermission('roles', 'delete'),
   validateIdParam(),
   async (req, res) => {
     try {
@@ -554,8 +721,8 @@ router.delete(
       // Log the deletion
       await auditService.log({
         userId: req.dbUser.id,
-        action: "role_delete",
-        resourceType: "role",
+        action: 'role_delete',
+        resourceType: 'role',
         resourceId: roleId,
         oldValues: { name: deletedRole.name },
         ipAddress: getClientIp(req),
@@ -564,31 +731,31 @@ router.delete(
 
       res.json({
         success: true,
-        message: "Role deleted successfully",
+        message: 'Role deleted successfully',
         timestamp: new Date().toISOString(),
       });
     } catch (error) {
-      logger.error("Error deleting role", {
+      logger.error('Error deleting role', {
         error: error.message,
         roleId: req.params.id,
       });
 
       if (
-        error.message === "Cannot delete protected role" ||
-        error.message === "Cannot delete role: users are assigned to this role"
+        error.message === 'Cannot delete protected role' ||
+        error.message.startsWith('Cannot delete role:')
       ) {
         return res.status(HTTP_STATUS.BAD_REQUEST).json({
           success: false,
-          error: "Bad Request",
+          error: 'Bad Request',
           message: error.message,
           timestamp: new Date().toISOString(),
         });
       }
 
-      if (error.message === "Role not found") {
+      if (error.message === 'Role not found') {
         return res.status(HTTP_STATUS.NOT_FOUND).json({
           success: false,
-          error: "Role Not Found",
+          error: 'Role not found',
           message: error.message,
           timestamp: new Date().toISOString(),
         });
@@ -596,8 +763,8 @@ router.delete(
 
       res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
         success: false,
-        error: "Internal Server Error",
-        message: "Failed to delete role",
+        error: 'Internal Server Error',
+        message: 'Failed to delete role',
         timestamp: new Date().toISOString(),
       });
     }

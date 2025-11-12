@@ -9,7 +9,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../config/constants.dart';
-import '../../utils/helpers/ui_helpers.dart';
+import '../../services/notification_service.dart';
 
 class LoginForm extends StatelessWidget {
   const LoginForm({super.key});
@@ -58,11 +58,11 @@ class LoginForm extends StatelessWidget {
         }
         // On web, do nothing - browser is redirecting to Auth0
       } else {
-        UiHelpers.showErrorSnackBar(context, AppConstants.auth0LoginFailed);
+        NotificationService.showError(context, AppConstants.auth0LoginFailed);
       }
     } catch (e) {
       if (context.mounted) {
-        UiHelpers.showErrorSnackBar(context, 'Auth0 login failed: $e');
+        NotificationService.showError(context, 'Auth0 login failed: $e');
       }
     }
   }

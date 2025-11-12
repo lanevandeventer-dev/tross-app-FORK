@@ -6,6 +6,7 @@ library;
 import 'package:flutter/material.dart';
 import '../../../config/app_spacing.dart';
 import '../../../config/app_colors.dart';
+import '../../../utils/helpers/string_helper.dart';
 
 class UserAvatar extends StatelessWidget {
   final String name;
@@ -22,23 +23,27 @@ class UserAvatar extends StatelessWidget {
   });
 
   String get _initials {
-    final parts = name.trim().split(' ').where((p) => p.isNotEmpty).toList();
+    final parts = StringHelper.trim(
+      name,
+    ).split(' ').where((p) => p.isNotEmpty).toList();
 
     if (parts.isEmpty) {
       // No valid name parts, try email
       if (email != null && email!.isNotEmpty) {
-        return email![0].toUpperCase();
+        return StringHelper.getInitial(email!);
       }
       return '?';
     }
 
     if (parts.length == 1) {
       // Single name, take first character
-      return parts[0][0].toUpperCase();
+      return StringHelper.getInitial(parts[0]);
     }
 
     // Multiple parts, take first char of first and last
-    return '${parts[0][0]}${parts[parts.length - 1][0]}'.toUpperCase();
+    final firstInitial = StringHelper.getInitial(parts[0]);
+    final lastInitial = StringHelper.getInitial(parts[parts.length - 1]);
+    return '$firstInitial$lastInitial';
   }
 
   @override

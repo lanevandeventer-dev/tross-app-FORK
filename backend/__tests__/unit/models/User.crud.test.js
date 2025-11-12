@@ -111,42 +111,54 @@ describe("User Model - CRUD Operations", () => {
   });
 
   // ===========================
-  // READ: getAll()
+  // READ: findAll() - Paginated
   // ===========================
-  describe("getAll()", () => {
-    it("should return all users with roles", async () => {
+  describe("findAll()", () => {
+    it("should return paginated users with roles", async () => {
       // Arrange
       const mockUsers = [
         { id: 1, email: "admin@example.com", role: "admin" },
         { id: 2, email: "client@example.com", role: "client" },
         { id: 3, email: "manager@example.com", role: "manager" },
       ];
-      db.query.mockResolvedValue({ rows: mockUsers });
+      db.query
+        .mockResolvedValueOnce({ rows: [{ total: 3 }] }) // count query
+        .mockResolvedValueOnce({ rows: mockUsers }); // data query
 
       // Act
-      const users = await User.getAll();
+      const result = await User.findAll({ page: 1, limit: 50 });
 
       // Assert
-      expect(users).toEqual(mockUsers);
-      expect(users).toHaveLength(3);
+      expect(result.data).toEqual(mockUsers);
+      expect(result.data).toHaveLength(3);
+      expect(result.pagination).toEqual({
+        page: 1,
+        limit: 50,
+        total: 3,
+        totalPages: 1,
+        hasNext: false,
+        hasPrev: false,
+      });
+      // Updated expectation: now passes parameters for filters
       expect(db.query).toHaveBeenCalledWith(
-        expect.stringContaining("SELECT u.*, r.name as role"),
-      );
-      expect(db.query).toHaveBeenCalledWith(
-        expect.stringContaining("ORDER BY u.created_at DESC"),
+        expect.stringContaining("SELECT COUNT(*) as total"),
+        expect.any(Array) // Now passes parameters array
       );
     });
 
-    it("should return empty array when no users exist", async () => {
+    it("should return empty data array when no users exist", async () => {
       // Arrange
-      db.query.mockResolvedValue({ rows: [] });
+      db.query
+        .mockResolvedValueOnce({ rows: [{ total: 0 }] }) // count query
+        .mockResolvedValueOnce({ rows: [] }); // data query
 
       // Act
-      const users = await User.getAll();
+      const result = await User.findAll();
 
       // Assert
-      expect(users).toEqual([]);
-      expect(users).toHaveLength(0);
+      expect(result.data).toEqual([]);
+      expect(result.data).toHaveLength(0);
+      expect(result.pagination.total).toBe(0);
     });
   });
 
@@ -317,7 +329,7 @@ describe("User Model - CRUD Operations", () => {
       expect(user).toEqual(mockUserWithRole);
       expect(db.query).toHaveBeenCalledWith(
         expect.stringContaining("INSERT INTO users"),
-        ["manual@example.com", "Manual", "User", 3],
+        ["manual@example.com", "Manual", "User", 3, null, "pending_activation"],
       );
     });
 
@@ -346,7 +358,7 @@ describe("User Model - CRUD Operations", () => {
       expect(Role.getByName).toHaveBeenCalledWith("client");
       expect(db.query).toHaveBeenCalledWith(
         expect.stringContaining("INSERT INTO users"),
-        ["defaultrole@example.com", "Default", "User", 2],
+        ["defaultrole@example.com", "Default", "User", 2, null, "pending_activation"],
       );
     });
 
@@ -373,7 +385,7 @@ describe("User Model - CRUD Operations", () => {
       expect(user).toEqual(mockUserWithRole);
       expect(db.query).toHaveBeenCalledWith(
         expect.stringContaining("INSERT INTO users"),
-        ["minimal@example.com", "", "", 2],
+        ["minimal@example.com", "", "", 2, null, "pending_activation"],
       );
     });
   });
@@ -473,61 +485,63 @@ describe("User Model - CRUD Operations", () => {
         ["test@example.com", 1],
       );
     });
+
+    // Contract v2.0: update() no longer auto-manages audit fields
+    // Audit logging happens via AuditService (tested separately in deactivate/reactivate methods)
+    it("should update is_active field without audit fields", async () => {
+      // Arrange
+      const updates = { is_active: false };
+      const mockUpdatedUser = {
+        id: 5,
+        is_active: false,
+      };
+      db.query.mockResolvedValue({ rows: [mockUpdatedUser] });
+
+      // Act
+      const user = await User.update(5, updates);
+
+      // Assert
+      expect(user).toEqual(mockUpdatedUser);
+      expect(db.query).toHaveBeenCalledWith(
+        expect.stringContaining("UPDATE users"),
+        expect.arrayContaining([
+          false, // is_active
+          5, // user id
+        ]),
+      );
+    });
+
+    it("should update fields normally", async () => {
+      // Arrange
+      const updates = { first_name: "Changed" };
+      const mockUpdatedUser = { id: 5, first_name: "Changed" };
+      db.query.mockResolvedValue({ rows: [mockUpdatedUser] });
+
+      // Act
+      const user = await User.update(5, updates);
+
+      // Assert
+      expect(user).toEqual(mockUpdatedUser);
+      expect(db.query).toHaveBeenCalledWith(
+        expect.stringContaining("first_name = $1"),
+        ["Changed", 5],
+      );
+    });
   });
 
   // ===========================
   // DELETE: delete()
   // ===========================
   describe("delete()", () => {
-    it("should soft delete user by default", async () => {
-      // Arrange
-      const mockDeletedUser = { id: 1, is_active: false };
-      db.query.mockResolvedValue({ rows: [mockDeletedUser] });
-
-      // Act
-      const user = await User.delete(1);
-
-      // Assert
-      expect(user).toEqual(mockDeletedUser);
-      expect(db.query).toHaveBeenCalledWith(
-        expect.stringContaining("UPDATE users"),
-        [1],
-      );
-      expect(db.query).toHaveBeenCalledWith(
-        expect.stringContaining("SET is_active = false"),
-        [1],
-      );
-      expect(db.query).not.toHaveBeenCalledWith(
-        expect.stringContaining("DELETE FROM"),
-        expect.anything(),
-      );
-    });
-
-    it("should soft delete when explicitly set to false", async () => {
-      // Arrange
-      const mockDeletedUser = { id: 1, is_active: false };
-      db.query.mockResolvedValue({ rows: [mockDeletedUser] });
-
-      // Act
-      const user = await User.delete(1, false);
-
-      // Assert
-      expect(user).toEqual(mockDeletedUser);
-      expect(db.query).toHaveBeenCalledWith(
-        expect.stringContaining("UPDATE users"),
-        [1],
-      );
-    });
-
-    it("should hard delete when explicitly set to true", async () => {
+    it("should permanently delete user from database", async () => {
       // Arrange
       const mockDeletedUser = { id: 1, email: "deleted@example.com" };
       db.query.mockResolvedValue({ rows: [mockDeletedUser] });
 
       // Act
-      const user = await User.delete(1, true);
+      const user = await User.delete(1);
 
-      // Assert
+      // Assert: DELETE = permanent removal
       expect(user).toEqual(mockDeletedUser);
       expect(db.query).toHaveBeenCalledWith(
         expect.stringContaining("DELETE FROM users"),
@@ -536,6 +550,18 @@ describe("User Model - CRUD Operations", () => {
       expect(db.query).not.toHaveBeenCalledWith(
         expect.stringContaining("UPDATE"),
         expect.anything(),
+      );
+    });
+
+    it("should throw error when user not found", async () => {
+      // Arrange
+      db.query.mockResolvedValue({ rows: [] });
+
+      // Act & Assert
+      await expect(User.delete(999)).rejects.toThrow("User not found");
+      expect(db.query).toHaveBeenCalledWith(
+        expect.stringContaining("DELETE FROM users"),
+        [999],
       );
     });
   });

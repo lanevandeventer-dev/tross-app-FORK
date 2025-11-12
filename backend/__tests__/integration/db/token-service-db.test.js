@@ -14,7 +14,6 @@
 
 const TokenService = require("../../../services/token-service");
 const {
-  setupTestDatabase,
   getTestPool,
   cleanupTestDatabase,
   createTestUser,
@@ -25,10 +24,7 @@ const jwt = require("jsonwebtoken");
 describe("TokenService - Integration Tests (Real DB)", () => {
   let testUser;
 
-  beforeAll(async () => {
-    // Database already set up by global setup
-  });
-
+  // STANDARD PATTERN: Clean data between tests
   beforeEach(async () => {
     // Clean database before each test
     await cleanupTestDatabase();

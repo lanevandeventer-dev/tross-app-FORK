@@ -26,63 +26,86 @@ class FormValidators {
   /// Email validator for TextFormField
   ///
   /// Returns error message or null
-  static String? email(String? value) => Validators.email(value);
+  static String? email(dynamic value) {
+    if (value is! String?) return 'Invalid email format';
+    return Validators.email(value);
+  }
 
   /// Required field validator
   ///
   /// Returns error message or null
-  static String? Function(String?) required([String fieldName = 'Field']) {
-    return (value) => Validators.required(value, fieldName: fieldName);
+  static String? Function(dynamic) required([String fieldName = 'Field']) {
+    return (value) {
+      if (value is! String?) return '$fieldName is required';
+      return Validators.required(value, fieldName: fieldName);
+    };
   }
 
   /// Minimum length validator
   ///
   /// Returns error message or null
-  static String? Function(String?) minLength(
+  static String? Function(dynamic) minLength(
     int minLen, [
     String fieldName = 'Field',
   ]) {
-    return (value) => Validators.minLength(value, minLen, fieldName: fieldName);
+    return (value) {
+      if (value is! String?) {
+        return '$fieldName must be at least $minLen characters';
+      }
+      return Validators.minLength(value, minLen, fieldName: fieldName);
+    };
   }
 
   /// Maximum length validator
   ///
   /// Returns error message or null
-  static String? Function(String?) maxLength(
+  static String? Function(dynamic) maxLength(
     int maxLen, [
     String fieldName = 'Field',
   ]) {
-    return (value) => Validators.maxLength(value, maxLen, fieldName: fieldName);
+    return (value) {
+      if (value is! String?) return '$fieldName is too long';
+      return Validators.maxLength(value, maxLen, fieldName: fieldName);
+    };
   }
 
   /// Integer validator for TextFormField
   ///
   /// Returns error message or null
-  static String? Function(String?) integer([String fieldName = 'Field']) {
-    return (value) => Validators.integer(value, fieldName: fieldName);
+  static String? Function(dynamic) integer([String fieldName = 'Field']) {
+    return (value) {
+      if (value is! String?) return '$fieldName must be a number';
+      return Validators.integer(value, fieldName: fieldName);
+    };
   }
 
   /// Positive integer validator
   ///
   /// Returns error message or null
-  static String? Function(String?) positive([String fieldName = 'Field']) {
-    return (value) => Validators.positive(value, fieldName: fieldName);
+  static String? Function(dynamic) positive([String fieldName = 'Field']) {
+    return (value) {
+      if (value is! String?) return '$fieldName must be positive';
+      return Validators.positive(value, fieldName: fieldName);
+    };
   }
 
   /// Integer range validator
   ///
   /// Returns error message or null
-  static String? Function(String?) integerRange({
+  static String? Function(dynamic) integerRange({
     int? min,
     int? max,
     String fieldName = 'Field',
   }) {
-    return (value) => Validators.integerRange(
-      value,
-      min: min,
-      max: max,
-      fieldName: fieldName,
-    );
+    return (value) {
+      if (value is! String?) return '$fieldName must be a number';
+      return Validators.integerRange(
+        value,
+        min: min,
+        max: max,
+        fieldName: fieldName,
+      );
+    };
   }
 
   /// Compose multiple validators

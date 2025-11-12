@@ -223,7 +223,7 @@ class AppTheme {
 
   /// Dark theme configuration (currently same as light, to be customized)
   static ThemeData get darkTheme {
-    // TODO: Implement dark theme with AppColors.backgroundDark, etc.
+    // Future: Implement dark theme with AppColors.backgroundDark, etc.
     // For now, return light theme as fallback
     return lightTheme.copyWith(
       brightness: Brightness.dark,

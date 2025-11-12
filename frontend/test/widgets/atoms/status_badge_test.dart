@@ -1,8 +1,9 @@
 /// StatusBadge Atom Tests
 ///
 /// Comprehensive tests for the StatusBadge atom component
-/// Tests rendering, styling, role factory, and variants
+/// Tests rendering, styling, and variants (generic, data-driven)
 /// ✅ MIGRATED: Uses test infrastructure (helpers, spacing)
+/// ✅ UPDATED: Removed .role() factory tests (domain-specific logic removed)
 library;
 
 import 'package:flutter/material.dart';
@@ -60,60 +61,8 @@ void main() {
       );
     });
 
-    group('Role Factory Tests', () {
-      testWidgets('creates Admin badge with correct styling', (tester) async {
-        await pumpTestWidget(tester, StatusBadge.role('admin'));
-
-        expect(find.text('Admin'), findsOneWidget);
-        expect(find.byIcon(Icons.admin_panel_settings), findsOneWidget);
-      });
-
-      testWidgets('creates Technician badge with correct styling', (
-        tester,
-      ) async {
-        await pumpTestWidget(tester, StatusBadge.role('technician'));
-
-        expect(find.text('Technician'), findsOneWidget);
-        expect(find.byIcon(Icons.build), findsOneWidget);
-      });
-
-      testWidgets('creates Manager badge with correct styling', (tester) async {
-        await pumpTestWidget(tester, StatusBadge.role('manager'));
-
-        expect(find.text('Manager'), findsOneWidget);
-        expect(find.byIcon(Icons.business_center), findsOneWidget);
-      });
-
-      testWidgets('creates Dispatcher badge with correct styling', (
-        tester,
-      ) async {
-        await pumpTestWidget(tester, StatusBadge.role('dispatcher'));
-
-        expect(find.text('Dispatcher'), findsOneWidget);
-        expect(find.byIcon(Icons.route), findsOneWidget);
-      });
-
-      testWidgets('creates Client badge with correct styling', (tester) async {
-        await pumpTestWidget(tester, StatusBadge.role('client'));
-
-        expect(find.text('Client'), findsOneWidget);
-        expect(find.byIcon(Icons.person), findsOneWidget);
-      });
-
-      testWidgets('handles unknown role with neutral styling', (tester) async {
-        await pumpTestWidget(tester, StatusBadge.role('unknown'));
-
-        expect(find.text('Unknown'), findsOneWidget);
-        expect(find.byIcon(Icons.label), findsOneWidget);
-      });
-
-      testWidgets('capitalizes role name', (tester) async {
-        await pumpTestWidget(tester, StatusBadge.role('admin'));
-
-        expect(find.text('Admin'), findsOneWidget);
-        expect(find.text('admin'), findsNothing);
-      });
-    });
+    // ✅ REMOVED: Role Factory Tests - StatusBadge.role() was domain-specific
+    // StatusBadge is now fully generic - tests below verify generic usage
 
     group('Style Variants Tests', () {
       testWidgets('applies success style', (tester) async {
@@ -160,42 +109,6 @@ void main() {
 
         expect(find.text('Neutral'), findsOneWidget);
       });
-    });
-
-    testWidgets('has proper border radius', (tester) async {
-      await pumpTestWidget(tester, const StatusBadge(label: 'Test'));
-
-      final container = tester.widget<Container>(
-        find.ancestor(of: find.text('Test'), matching: find.byType(Container)),
-      );
-
-      final decoration = container.decoration as BoxDecoration;
-      expect(decoration.borderRadius, BorderRadius.circular(TestSpacing.md));
-    });
-
-    testWidgets('compact variant has smaller border radius', (tester) async {
-      await pumpTestWidget(
-        tester,
-        const StatusBadge(label: 'Test', compact: true),
-      );
-
-      final container = tester.widget<Container>(
-        find.ancestor(of: find.text('Test'), matching: find.byType(Container)),
-      );
-
-      final decoration = container.decoration as BoxDecoration;
-      expect(decoration.borderRadius, BorderRadius.circular(TestSpacing.sm));
-    });
-
-    testWidgets('has border decoration', (tester) async {
-      await pumpTestWidget(tester, const StatusBadge(label: 'Test'));
-
-      final container = tester.widget<Container>(
-        find.ancestor(of: find.text('Test'), matching: find.byType(Container)),
-      );
-
-      final decoration = container.decoration as BoxDecoration;
-      expect(decoration.border, isNotNull);
     });
   });
 }

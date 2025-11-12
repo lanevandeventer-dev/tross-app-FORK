@@ -1,215 +1,304 @@
 /// Role Service - API client for role operations
 /// Handles all HTTP requests to /api/roles endpoints
 ///
-/// NOTE: GET /api/roles is public (no auth required)
-/// Other operations (create/update/delete) require admin authentication
+/// SECURITY:
+/// - GET /api/roles requires authentication (manager+)
+/// - Other operations (create/update/delete) require admin authentication
+///
+/// ARCHITECTURE:
+/// - Pure API client - no business logic
+/// - Dev mode support with hardcoded roles matching backend
+/// - Uses ApiClient for HTTP with auto token refresh
+/// - Response validation: parseSuccessResponse() helpers
+///
+/// DEPENDENCIES:
+/// - ApiClient: HTTP client with authentication
+/// - Role model: fromJson() validation with toSafe*()
 library;
 
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart' show debugPrint;
+
 import '../models/role_model.dart';
-import '../config/app_config.dart';
+import 'api_client.dart';
 
 class RoleService {
-  /// Get all roles (public endpoint)
+  // Private constructor - static class only
+  RoleService._();
+
+  /// Hardcoded dev roles - matches backend/config/test-users.js
+  /// Used in dev mode ONLY to populate role selector before authentication
   ///
-  /// Returns `List<Role>` on success
-  /// Throws exception on error with descriptive message
+  /// BACKEND PARITY: Must match backend test users exactly (role_id, name, priority)
+  /// - admin (id: 1, priority: 5) - Full system access
+  /// - manager (id: 2, priority: 4) - Operational management
+  /// - dispatcher (id: 3, priority: 3) - Service coordination
+  /// - technician (id: 4, priority: 2) - Field service
+  /// - client (id: 5, priority: 1) - Customer access
+  static final List<Role> _devRoles = [
+    Role(
+      id: 1,
+      name: 'admin',
+      priority: 5,
+      description: 'Administrator - Full system access',
+      createdAt: DateTime.parse('2025-01-01T00:00:00.000Z'),
+      updatedAt: DateTime.parse('2025-01-01T00:00:00.000Z'),
+      isActive: true,
+    ),
+    Role(
+      id: 2,
+      name: 'manager',
+      priority: 4,
+      description: 'Manager - Operational management',
+      createdAt: DateTime.parse('2025-01-01T00:00:00.000Z'),
+      updatedAt: DateTime.parse('2025-01-01T00:00:00.000Z'),
+      isActive: true,
+    ),
+    Role(
+      id: 3,
+      name: 'dispatcher',
+      priority: 3,
+      description: 'Dispatcher - Service coordination',
+      createdAt: DateTime.parse('2025-01-01T00:00:00.000Z'),
+      updatedAt: DateTime.parse('2025-01-01T00:00:00.000Z'),
+      isActive: true,
+    ),
+    Role(
+      id: 4,
+      name: 'technician',
+      priority: 2,
+      description: 'Technician - Field service',
+      createdAt: DateTime.parse('2025-01-01T00:00:00.000Z'),
+      updatedAt: DateTime.parse('2025-01-01T00:00:00.000Z'),
+      isActive: true,
+    ),
+    Role(
+      id: 5,
+      name: 'client',
+      priority: 1,
+      description: 'Client - Customer access',
+      createdAt: DateTime.parse('2025-01-01T00:00:00.000Z'),
+      updatedAt: DateTime.parse('2025-01-01T00:00:00.000Z'),
+      isActive: true,
+    ),
+  ];
+
+  /// Get all roles for dev mode (no auth required)
+  ///
+  /// DEV ONLY: Returns hardcoded role list matching backend test users.
+  /// Used by login screen to populate role selector BEFORE authentication.
+  ///
+  /// SECURITY: Only callable in dev mode (checked by caller via AppConfig.isDevMode)
+  /// In production, this should never be called - use getAll() instead.
+  ///
+  /// @returns Unmodifiable list of 5 hardcoded roles
+  ///
+  /// Example:
+  /// ```dart
+  /// if (AppConfig.isDevMode) {
+  ///   final roles = RoleService.getAllForDevMode();
+  ///   // Show role selector in login screen
+  /// }
+  /// ```
+  static List<Role> getAllForDevMode() {
+    // Return copy to prevent external modification
+    return List.unmodifiable(_devRoles);
+  }
+
+  /// Fetch all roles (requires auth: manager+)
+  ///
+  /// Returns list of all active roles in the system with their priorities.
+  /// Used for role management screens and permission checks.
+  ///
+  /// @returns List of Role instances sorted by priority descending (admin first)
+  /// @throws Exception on auth failures or server errors
+  ///
+  /// Example:
+  /// ```dart
+  /// final roles = await RoleService.getAll();
+  /// // Display in role management screen
+  /// ```
   static Future<List<Role>> getAll() async {
     try {
-      // Add pagination params (backend requires them)
-      final url = Uri.parse('${AppConfig.backendUrl}/api/roles').replace(
+      // Use ApiClient which automatically adds auth token
+      final response = await ApiClient.get(
+        '/roles',
         queryParameters: {
           'page': '1',
           'limit': '100', // Get all roles (there are only 5)
         },
       );
 
-      final response = await http
-          .get(url, headers: {'Content-Type': 'application/json'})
-          .timeout(
-            const Duration(seconds: 10),
-            onTimeout: () =>
-                throw Exception('Request timeout - backend not responding'),
-          );
-
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> jsonData = json.decode(response.body);
-
-        if (jsonData['success'] == true && jsonData['data'] != null) {
-          final List<dynamic> rolesJson = jsonData['data'];
-          return rolesJson.map((json) => Role.fromJson(json)).toList();
-        }
-
-        throw Exception('Invalid response format from backend');
-      } else {
-        final errorData = json.decode(response.body);
-        throw Exception(errorData['message'] ?? 'Failed to fetch roles');
-      }
+      return ApiClient.parseSuccessListResponse(response, Role.fromJson);
     } catch (e) {
       if (e.toString().contains('Exception:')) {
         rethrow;
       }
-      throw Exception('Network error: ${e.toString()}');
+      throw Exception('Failed to fetch roles: ${e.toString()}');
     }
   }
 
-  /// Get role by ID (public endpoint)
+  /// Fetch single role by ID (requires auth: manager+)
   ///
-  /// Returns Role on success
-  /// Throws exception if role not found or error occurs
+  /// Retrieves complete role information including priority and description.
+  ///
+  /// @param roleId - Database role ID (1-5 for standard roles)
+  /// @returns Role instance with all metadata
+  /// @throws Exception if role not found or auth fails
+  ///
+  /// Example:
+  /// ```dart
+  /// final role = await RoleService.getById(3); // Get dispatcher role
+  /// print('${role.name} (priority: ${role.priority})');
+  /// ```
   static Future<Role> getById(int roleId) async {
     try {
-      final url = Uri.parse('${AppConfig.backendUrl}/api/roles/$roleId');
+      final response = await ApiClient.get('/roles/$roleId');
 
-      final response = await http
-          .get(url, headers: {'Content-Type': 'application/json'})
-          .timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> jsonData = json.decode(response.body);
-
-        if (jsonData['success'] == true && jsonData['data'] != null) {
-          return Role.fromJson(jsonData['data']);
-        }
-
-        throw Exception('Invalid response format from backend');
-      } else if (response.statusCode == 404) {
-        throw Exception('Role not found');
-      } else {
-        final errorData = json.decode(response.body);
-        throw Exception(errorData['message'] ?? 'Failed to fetch role');
-      }
+      return ApiClient.parseSuccessResponse(response, Role.fromJson);
     } catch (e) {
       if (e.toString().contains('Exception:')) {
         rethrow;
       }
-      throw Exception('Network error: ${e.toString()}');
+      throw Exception('Failed to fetch role: ${e.toString()}');
     }
+  }
+
+  /// Get available role names sorted by priority (requires auth: manager+)
+  ///
+  /// Returns list of role names ordered highest priority first (admin → client).
+  /// Useful for dropdowns and role selection UI.
+  ///
+  /// @returns List of role name strings sorted by priority descending
+  /// @throws Exception on auth failures or server errors
+  ///
+  /// Example:
+  /// ```dart
+  /// final roleNames = await RoleService.getAvailableRoleNames();
+  /// // ['admin', 'manager', 'dispatcher', 'technician', 'client']
+  /// ```
+  static Future<List<String>> getAvailableRoleNames() async {
+    final roles = await getAll();
+    // Sort by priority descending (admin first)
+    roles.sort((a, b) => (b.priority ?? 0).compareTo(a.priority ?? 0));
+    return roles.map((role) => role.name).toList();
   }
 
   /// Create new role (admin only)
   ///
-  /// Returns created Role on success
-  /// Throws exception on error
-  static Future<Role> create(String name, String authToken) async {
+  /// Creates a new role with the specified name and default priority.
+  ///
+  /// @param name - Unique role name (lowercase, alphanumeric + underscore)
+  /// @returns Created Role instance with generated ID
+  /// @throws Exception if name already exists or validation fails
+  ///
+  /// Example:
+  /// ```dart
+  /// final newRole = await RoleService.create('supervisor');
+  /// ```
+  static Future<Role> create(String name) async {
     try {
-      final url = Uri.parse('${AppConfig.backendUrl}/api/roles');
+      final response = await ApiClient.post('/roles', body: {'name': name});
 
-      final response = await http
-          .post(
-            url,
-            headers: {
-              'Authorization': 'Bearer $authToken',
-              'Content-Type': 'application/json',
-            },
-            body: json.encode({'name': name}),
-          )
-          .timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 201) {
-        final Map<String, dynamic> jsonData = json.decode(response.body);
-
-        if (jsonData['success'] == true && jsonData['data'] != null) {
-          return Role.fromJson(jsonData['data']);
-        }
-
-        throw Exception('Invalid response format from backend');
-      } else if (response.statusCode == 400) {
-        final errorData = json.decode(response.body);
-        throw Exception(errorData['message'] ?? 'Invalid role data');
-      } else if (response.statusCode == 401 || response.statusCode == 403) {
-        throw Exception('Unauthorized - Admin access required');
-      } else {
-        final errorData = json.decode(response.body);
-        throw Exception(errorData['message'] ?? 'Failed to create role');
-      }
+      return ApiClient.parseSuccessResponse(response, Role.fromJson);
     } catch (e) {
       if (e.toString().contains('Exception:')) {
         rethrow;
       }
-      throw Exception('Network error: ${e.toString()}');
+      throw Exception('Failed to create role: ${e.toString()}');
     }
   }
 
   /// Update role (admin only)
   ///
-  /// Returns updated Role on success
-  /// Throws exception on error (including protected roles)
-  static Future<Role> update(int roleId, String name, String authToken) async {
+  /// Updates role fields. All fields optional - only provided fields are updated.
+  /// Cannot update protected system roles (enforced by backend).
+  ///
+  /// @param roleId - Target role's database ID
+  /// @param name - Optional: New role name
+  /// @param isActive - Optional: Enable/disable role
+  /// @param description - Optional: New description
+  /// @param priority - Optional: Role hierarchy (1-100)
+  /// @param permissions - Optional: New permissions array
+  /// @returns Updated Role instance
+  /// @throws Exception if role is protected, in use, or validation fails
+  ///
+  /// Example:
+  /// ```dart
+  /// await RoleService.update(7, description: 'Updated description', priority: 75);
+  /// ```
+  static Future<Role> update(
+    int roleId, {
+    String? name,
+    bool? isActive,
+    String? description,
+    int? priority,
+    List<String>? permissions,
+  }) async {
     try {
-      final url = Uri.parse('${AppConfig.backendUrl}/api/roles/$roleId');
+      // Build request body with only provided fields
+      final body = <String, dynamic>{};
+      if (name != null) body['name'] = name;
+      if (isActive != null) body['is_active'] = isActive;
+      if (description != null) body['description'] = description;
+      if (priority != null) body['priority'] = priority;
+      if (permissions != null) body['permissions'] = permissions;
 
-      final response = await http
-          .put(
-            url,
-            headers: {
-              'Authorization': 'Bearer $authToken',
-              'Content-Type': 'application/json',
-            },
-            body: json.encode({'name': name}),
-          )
-          .timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> jsonData = json.decode(response.body);
-
-        if (jsonData['success'] == true && jsonData['data'] != null) {
-          return Role.fromJson(jsonData['data']);
-        }
-
-        throw Exception('Invalid response format from backend');
-      } else if (response.statusCode == 403) {
-        throw Exception('Cannot modify protected role');
-      } else if (response.statusCode == 404) {
-        throw Exception('Role not found');
-      } else {
-        final errorData = json.decode(response.body);
-        throw Exception(errorData['message'] ?? 'Failed to update role');
+      if (body.isEmpty) {
+        throw Exception('At least one field must be provided for update');
       }
+
+      debugPrint('🔍 [RoleService] Updating role $roleId with: $body');
+
+      final response = await ApiClient.put('/roles/$roleId', body: body);
+
+      debugPrint('✅ [RoleService] Update response received: ${response.keys}');
+
+      final updatedRole = ApiClient.parseSuccessResponse(
+        response,
+        Role.fromJson,
+      );
+
+      debugPrint(
+        '✅ [RoleService] Role parsed successfully: ${updatedRole.name}',
+      );
+
+      return updatedRole;
     } catch (e) {
+      debugPrint('❌ [RoleService] Update failed: $e');
       if (e.toString().contains('Exception:')) {
         rethrow;
       }
-      throw Exception('Network error: ${e.toString()}');
+      throw Exception('Failed to update role: ${e.toString()}');
     }
   }
 
   /// Delete role (admin only)
   ///
-  /// Returns true on success
-  /// Throws exception on error (including protected roles or roles in use)
-  static Future<bool> delete(int roleId, String authToken) async {
+  /// Permanently removes role from the system. This action is irreversible.
+  /// Cannot delete protected system roles or roles currently assigned to users.
+  ///
+  /// @param roleId - Target role's database ID
+  /// @returns true if deletion successful
+  /// @throws Exception if role is protected, in use, not found, or auth fails
+  ///
+  /// Example:
+  /// ```dart
+  /// final success = await RoleService.delete(7); // Delete custom role
+  /// ```
+  static Future<bool> delete(int roleId) async {
     try {
-      final url = Uri.parse('${AppConfig.backendUrl}/api/roles/$roleId');
+      final response = await ApiClient.delete('/roles/$roleId');
 
-      final response = await http
-          .delete(
-            url,
-            headers: {
-              'Authorization': 'Bearer $authToken',
-              'Content-Type': 'application/json',
-            },
-          )
-          .timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200) {
+      if (response['success'] == true) {
         return true;
-      } else if (response.statusCode == 403) {
-        throw Exception('Cannot delete protected role');
-      } else if (response.statusCode == 409) {
-        throw Exception('Role is in use by existing users');
-      } else if (response.statusCode == 404) {
-        throw Exception('Role not found');
-      } else {
-        final errorData = json.decode(response.body);
-        throw Exception(errorData['message'] ?? 'Failed to delete role');
       }
+
+      throw Exception('Invalid response format from backend');
     } catch (e) {
       if (e.toString().contains('Exception:')) {
         rethrow;
       }
-      throw Exception('Network error: ${e.toString()}');
+      throw Exception('Failed to delete role: ${e.toString()}');
     }
   }
 }

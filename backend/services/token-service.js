@@ -1,14 +1,14 @@
-const jwt = require("jsonwebtoken");
-const { v4: uuidv4 } = require("../utils/uuid"); // Use CommonJS wrapper for Jest compatibility
-const bcrypt = require("bcrypt");
-const pool = require("../db/connection");
-const { logger } = require("../config/logger");
-const { toSafeInteger, toSafeUuid } = require("../validators/type-coercion");
+const jwt = require('jsonwebtoken');
+const { v4: uuidv4 } = require('../utils/uuid'); // Use CommonJS wrapper for Jest compatibility
+const bcrypt = require('bcrypt');
+const pool = require('../db/connection');
+const { logger } = require('../config/logger');
+const { toSafeInteger, toSafeUuid } = require('../validators/type-coercion');
 
 // JWT Configuration from environment variables
-const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-key";
-const JWT_ACCESS_EXPIRY = "15m"; // 15 minutes
-const JWT_REFRESH_EXPIRY = "7d"; // 7 days
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-key';
+const JWT_ACCESS_EXPIRY = '15m'; // 15 minutes
+const JWT_REFRESH_EXPIRY = '7d'; // 7 days
 
 /**
  * TokenService - Manages JWT token lifecycle with refresh token rotation
@@ -30,7 +30,7 @@ class TokenService {
           userId: user.id,
           email: user.email,
           role: user.role,
-          type: "access",
+          type: 'access',
         },
         JWT_SECRET,
         { expiresIn: JWT_ACCESS_EXPIRY },
@@ -42,7 +42,7 @@ class TokenService {
         {
           userId: user.id,
           tokenId: refreshTokenId,
-          type: "refresh",
+          type: 'refresh',
         },
         JWT_SECRET,
         { expiresIn: JWT_REFRESH_EXPIRY },
@@ -60,7 +60,7 @@ class TokenService {
         [refreshTokenId, user.id, tokenHash, expiresAt, ipAddress, userAgent],
       );
 
-      logger.info("Token pair generated", {
+      logger.info('Token pair generated', {
         userId: user.id,
         tokenId: refreshTokenId,
         ipAddress,
@@ -71,7 +71,7 @@ class TokenService {
         refreshToken: refreshTokenValue,
       };
     } catch (error) {
-      logger.error("Error generating token pair", {
+      logger.error('Error generating token pair', {
         error: error.message,
         userId: user.id,
       });
@@ -91,8 +91,8 @@ class TokenService {
       // Verify and decode refresh token
       const decoded = jwt.verify(refreshToken, JWT_SECRET);
 
-      if (decoded.type !== "refresh") {
-        throw new Error("Invalid token type");
+      if (decoded.type !== 'refresh') {
+        throw new Error('Invalid token type');
       }
 
       // Check if token exists and is valid in database
@@ -109,11 +109,11 @@ class TokenService {
       );
 
       if (result.rows.length === 0) {
-        logger.warn("Refresh token not found or invalid", {
+        logger.warn('Refresh token not found or invalid', {
           tokenId: decoded.tokenId,
           userId: decoded.userId,
         });
-        throw new Error("Invalid refresh token");
+        throw new Error('Invalid refresh token');
       }
 
       const storedToken = result.rows[0];
@@ -124,11 +124,11 @@ class TokenService {
         storedToken.token_hash,
       );
       if (!isValid) {
-        logger.error("Refresh token hash mismatch", {
+        logger.error('Refresh token hash mismatch', {
           tokenId: decoded.tokenId,
           userId: decoded.userId,
         });
-        throw new Error("Invalid refresh token");
+        throw new Error('Invalid refresh token');
       }
 
       // Update last used timestamp
@@ -153,9 +153,9 @@ class TokenService {
       );
 
       // Revoke old refresh token
-      await this.revokeToken(decoded.tokenId, "rotated");
+      await this.revokeToken(decoded.tokenId, 'rotated');
 
-      logger.info("Access token refreshed", {
+      logger.info('Access token refreshed', {
         userId: decoded.userId,
         oldTokenId: decoded.tokenId,
         ipAddress,
@@ -163,15 +163,15 @@ class TokenService {
 
       return newTokenPair;
     } catch (error) {
-      if (error.name === "TokenExpiredError") {
-        logger.warn("Expired refresh token used", { error: error.message });
-        throw new Error("Refresh token expired");
+      if (error.name === 'TokenExpiredError') {
+        logger.warn('Expired refresh token used', { error: error.message });
+        throw new Error('Refresh token expired');
       }
-      if (error.name === "JsonWebTokenError") {
-        logger.warn("Invalid refresh token format", { error: error.message });
-        throw new Error("Invalid refresh token");
+      if (error.name === 'JsonWebTokenError') {
+        logger.warn('Invalid refresh token format', { error: error.message });
+        throw new Error('Invalid refresh token');
       }
-      logger.error("Error refreshing token", { error: error.message });
+      logger.error('Error refreshing token', { error: error.message });
       throw error;
     }
   }
@@ -183,10 +183,10 @@ class TokenService {
    * @returns {Promise<boolean>}
    * @throws {Error} If tokenId is not a valid UUID
    */
-  async revokeToken(tokenId, reason = "logout") {
+  async revokeToken(tokenId, reason = 'logout') {
     try {
       // TYPE SAFETY: Validate UUID format before query
-      const safeTokenId = toSafeUuid(tokenId, "tokenId", { allowNull: false });
+      const safeTokenId = toSafeUuid(tokenId, 'tokenId', { allowNull: false });
 
       const result = await pool.query(
         `UPDATE refresh_tokens 
@@ -198,12 +198,12 @@ class TokenService {
       const revoked = result.rowCount > 0;
 
       if (revoked) {
-        logger.info("Refresh token revoked", { tokenId: safeTokenId, reason });
+        logger.info('Refresh token revoked', { tokenId: safeTokenId, reason });
       }
 
       return revoked;
     } catch (error) {
-      logger.error("Error revoking token", { error: error.message, tokenId });
+      logger.error('Error revoking token', { error: error.message, tokenId });
       throw error;
     }
   }
@@ -215,10 +215,10 @@ class TokenService {
    * @returns {Promise<number>} - Number of tokens revoked
    * @throws {Error} If userId is invalid
    */
-  async revokeAllUserTokens(userId, reason = "logout_all") {
+  async revokeAllUserTokens(userId, reason = 'logout_all') {
     try {
       // TYPE SAFETY: Validate userId before query
-      const safeUserId = toSafeInteger(userId, "userId", {
+      const safeUserId = toSafeInteger(userId, 'userId', {
         min: 1,
         allowNull: false,
       });
@@ -230,7 +230,7 @@ class TokenService {
         [safeUserId],
       );
 
-      logger.info("All user tokens revoked", {
+      logger.info('All user tokens revoked', {
         userId: safeUserId,
         reason,
         count: result.rowCount,
@@ -238,7 +238,7 @@ class TokenService {
 
       return result.rowCount;
     } catch (error) {
-      logger.error("Error revoking user tokens", {
+      logger.error('Error revoking user tokens', {
         error: error.message,
         userId,
       });
@@ -259,12 +259,12 @@ class TokenService {
       );
 
       if (result.rowCount > 0) {
-        logger.info("Expired tokens cleaned up", { count: result.rowCount });
+        logger.info('Expired tokens cleaned up', { count: result.rowCount });
       }
 
       return result.rowCount;
     } catch (error) {
-      logger.error("Error cleaning up tokens", { error: error.message });
+      logger.error('Error cleaning up tokens', { error: error.message });
       throw error;
     }
   }
@@ -278,7 +278,7 @@ class TokenService {
   async getUserTokens(userId) {
     try {
       // TYPE SAFETY: Validate userId before query
-      const safeUserId = toSafeInteger(userId, "userId", {
+      const safeUserId = toSafeInteger(userId, 'userId', {
         min: 1,
         allowNull: false,
       });
@@ -293,7 +293,7 @@ class TokenService {
 
       return result.rows;
     } catch (error) {
-      logger.error("Error fetching user tokens", {
+      logger.error('Error fetching user tokens', {
         error: error.message,
         userId,
       });

@@ -6,7 +6,7 @@
  * Changes here affect authentication, authorization, and API behavior.
  */
 
-const { ENVIRONMENTS, DATABASE, REDIS } = require("./constants");
+const { ENVIRONMENTS, DATABASE, REDIS } = require('./constants');
 
 /**
  * Get current environment from NODE_ENV
@@ -47,9 +47,9 @@ const AppConfig = {
   // ============================================================================
   // APP IDENTITY - Change "Tross" here to update everywhere!
   // ============================================================================
-  appName: "Tross",
-  appVersion: "1.0.0",
-  appDescription: "Professional Maintenance Management",
+  appName: 'Tross',
+  appVersion: '1.0.0',
+  appDescription: 'Professional Maintenance Management',
 
   // ============================================================================
   // ENVIRONMENT
@@ -90,14 +90,14 @@ const AppConfig = {
   // ============================================================================
   // SERVER CONFIGURATION
   // ============================================================================
-  port: parseInt(process.env.PORT || "3001", 10),
-  host: process.env.HOST || "localhost",
+  port: parseInt(process.env.PORT || '3001', 10),
+  host: process.env.HOST || 'localhost',
 
   // CORS Configuration
   cors: {
     origin: isDevelopment()
-      ? ["http://localhost:3000", "http://localhost:3001"]
-      : [process.env.FRONTEND_URL || "https://tross.com"],
+      ? ['http://localhost:3000', 'http://localhost:3001']
+      : [process.env.FRONTEND_URL || 'https://tross.com'],
     credentials: true,
   },
 
@@ -145,35 +145,35 @@ const AppConfig = {
   // AUTH0 CONFIGURATION
   // ============================================================================
   auth0: {
-    domain: process.env.AUTH0_DOMAIN || "dev-mglpuahc3cwf66wq.us.auth0.com",
-    clientId: process.env.AUTH0_CLIENT_ID || "WxWdn4aInQlttryLO0TYdvheBka8yXX4",
+    domain: process.env.AUTH0_DOMAIN || 'dev-mglpuahc3cwf66wq.us.auth0.com',
+    clientId: process.env.AUTH0_CLIENT_ID || 'WxWdn4aInQlttryLO0TYdvheBka8yXX4',
     clientSecret: process.env.AUTH0_CLIENT_SECRET,
-    audience: process.env.AUTH0_AUDIENCE || "https://api.tross.dev",
+    audience: process.env.AUTH0_AUDIENCE || 'https://api.tross.dev',
   },
 
   // ============================================================================
   // JWT CONFIGURATION
   // ============================================================================
   jwt: {
-    secret: process.env.JWT_SECRET || "your-secret-key-change-in-production",
-    expiresIn: process.env.JWT_EXPIRES_IN || "24h",
-    algorithm: "HS256",
+    secret: process.env.JWT_SECRET || 'your-secret-key-change-in-production',
+    expiresIn: process.env.JWT_EXPIRES_IN || '24h',
+    algorithm: 'HS256',
   },
 
   // ============================================================================
   // HEALTH CHECK CONFIGURATION
   // ============================================================================
   health: {
-    checkInterval: parseInt(process.env.HEALTH_CHECK_INTERVAL || "30000", 10),
-    timeout: parseInt(process.env.HEALTH_CHECK_TIMEOUT || "5000", 10),
+    checkInterval: parseInt(process.env.HEALTH_CHECK_INTERVAL || '30000', 10),
+    timeout: parseInt(process.env.HEALTH_CHECK_TIMEOUT || '5000', 10),
   },
 
   // ============================================================================
   // RATE LIMITING
   // ============================================================================
   rateLimit: {
-    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW || "900000", 10), // 15 minutes
-    max: parseInt(process.env.RATE_LIMIT_MAX || "100", 10),
+    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW || '900000', 10), // 15 minutes
+    max: parseInt(process.env.RATE_LIMIT_MAX || '100', 10),
   },
 
   // ============================================================================
@@ -190,7 +190,7 @@ const AppConfig = {
     if (!this.devAuthEnabled) {
       throw new Error(
         `Development authentication is not available in ${this.environment} mode. ` +
-          "This is a security restriction. Only Auth0 authentication is permitted.",
+          'This is a security restriction. Only Auth0 authentication is permitted.',
       );
     }
   },
@@ -226,24 +226,24 @@ const AppConfig = {
       // Production-specific validation
       if (
         !process.env.JWT_SECRET ||
-        process.env.JWT_SECRET === "your-secret-key-change-in-production"
+        process.env.JWT_SECRET === 'your-secret-key-change-in-production'
       ) {
-        errors.push("JWT_SECRET must be set in production");
+        errors.push('JWT_SECRET must be set in production');
       }
 
       if (!this.auth0.clientSecret) {
-        errors.push("AUTH0_CLIENT_SECRET must be set in production");
+        errors.push('AUTH0_CLIENT_SECRET must be set in production');
       }
 
       if (this.devAuthEnabled) {
         errors.push(
-          "Development authentication must be disabled in production",
+          'Development authentication must be disabled in production',
         );
       }
     }
 
     if (errors.length > 0) {
-      throw new Error(`Configuration validation failed:\n${errors.join("\n")}`);
+      throw new Error(`Configuration validation failed:\n${errors.join('\n')}`);
     }
   },
 };
@@ -253,7 +253,7 @@ if (!isTest()) {
   try {
     AppConfig.validate();
   } catch (error) {
-    console.error("Configuration Error:", error.message);
+    console.error('Configuration Error:', error.message);
     if (isProduction()) {
       // In production, fail fast if configuration is invalid
       process.exit(1);

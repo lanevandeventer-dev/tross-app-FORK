@@ -6,164 +6,94 @@
  *
  * Philosophy: Fail fast with clear, actionable error messages.
  *
- * Migrated from middleware/validation.js to consolidate all validators.
+ * NOW CENTRALIZED: Uses shared validation rules from config/validation-rules.json
+ * This ensures frontend and backend use IDENTICAL validation logic.
  */
-const Joi = require("joi");
-const { HTTP_STATUS } = require("../config/constants");
+const Joi = require('joi');
+const { HTTP_STATUS } = require('../config/constants');
+const { buildCompositeSchema, getValidationMetadata } = require('../utils/validation-loader');
+
+// Load validation metadata on startup
+try {
+  const metadata = getValidationMetadata();
+  console.log(`[ValidationLoader] 📋 Loaded validation rules v${metadata.version}`);
+  console.log(`[ValidationLoader] 📊 Available operations: ${metadata.operations.join(', ')}`);
+  console.log(`[ValidationLoader] 🎯 Policy: ${JSON.stringify(metadata.policy)}`);
+} catch (error) {
+  console.error('[ValidationLoader] ❌ Failed to load validation metadata:', error.message);
+}
 
 /**
  * Helper function to create validation middleware
  * DRY principle: Single error handler for all validators
  */
 const createValidator = (schema) => (req, res, next) => {
+  console.log('[VALIDATOR] Incoming request body:', JSON.stringify(req.body, null, 2));
+  console.log('[VALIDATOR] Body keys:', Object.keys(req.body));
+  console.log('[VALIDATOR] Email value:', req.body.email, 'Type:', typeof req.body.email);
+
   const { error } = schema.validate(req.body, {
     abortEarly: false, // Return all errors, not just the first
     stripUnknown: true, // Remove unknown fields for security
   });
 
   if (error) {
+    console.log('[VALIDATOR] Validation failed:', error.details);
     return res.status(HTTP_STATUS.BAD_REQUEST).json({
-      error: "Validation Error",
+      error: 'Validation Error',
       message: error.details[0].message,
       details: error.details.map((d) => ({
-        field: d.path.join("."),
+        field: d.path.join('.'),
         message: d.message,
       })),
       timestamp: new Date().toISOString(),
     });
   }
 
+  console.log('[VALIDATOR] Validation passed!');
   next();
 };
 
 /**
  * User Creation Validation
  * Validates: POST /api/users
+ * USES CENTRALIZED SCHEMA from validation-rules.json
  */
 const validateUserCreate = createValidator(
-  Joi.object({
-    email: Joi.string()
-      .email()
-      .required()
-      .trim()
-      .lowercase()
-      .max(255)
-      .messages({
-        "string.email": "Email must be a valid email address",
-        "string.empty": "Email is required",
-        "any.required": "Email is required",
-      }),
-    first_name: Joi.string().min(1).max(100).required().trim().messages({
-      "string.empty": "First name is required",
-      "string.max": "First name cannot exceed 100 characters",
-      "any.required": "First name is required",
-    }),
-    last_name: Joi.string().min(1).max(100).required().trim().messages({
-      "string.empty": "Last name is required",
-      "string.max": "Last name cannot exceed 100 characters",
-      "any.required": "Last name is required",
-    }),
-    role_id: Joi.number().integer().positive().optional().messages({
-      "number.base": "Role ID must be a number",
-      "number.integer": "Role ID must be an integer",
-      "number.positive": "Role ID must be positive",
-    }),
+  buildCompositeSchema('createUser'),
+);
+
+/**
+ * Profile Update Validation (User Updates)
+ * Validates: PUT /api/auth/me, PUT /api/users/:id
+ * USES CENTRALIZED SCHEMA from validation-rules.json
+ */
+const validateProfileUpdate = createValidator(
+  buildCompositeSchema('updateUser').min(1).messages({
+    'object.min': 'At least one field must be provided for update',
   }),
 );
 
 /**
- * User Profile Update Validation
- * Validates: PUT /api/auth/me, PUT /api/users/:id
- */
-const validateProfileUpdate = createValidator(
-  Joi.object({
-    email: Joi.string()
-      .email()
-      .optional()
-      .trim()
-      .lowercase()
-      .max(255)
-      .messages({
-        "string.email": "Email must be a valid email address",
-        "string.max": "Email cannot exceed 255 characters",
-      }),
-    first_name: Joi.string().min(1).max(100).optional().trim().messages({
-      "string.empty": "First name cannot be empty",
-      "string.max": "First name cannot exceed 100 characters",
-    }),
-    last_name: Joi.string().min(1).max(100).optional().trim().messages({
-      "string.empty": "Last name cannot be empty",
-      "string.max": "Last name cannot exceed 100 characters",
-    }),
-    is_active: Joi.boolean().optional().messages({
-      "boolean.base": "is_active must be true or false",
-    }),
-  })
-    .min(1)
-    .messages({
-      "object.min": "At least one field must be provided for update",
-    }),
-);
 
 /**
  * Role Creation Validation
  * Validates: POST /api/roles
+ * USES CENTRALIZED SCHEMA from validation-rules.json
  */
 const validateRoleCreate = createValidator(
-  Joi.object({
-    name: Joi.string()
-      .min(1)
-      .max(50)
-      .required()
-      .trim()
-      .lowercase()
-      .pattern(/^[a-z][a-z0-9_]*$/)
-      .messages({
-        "string.empty": "Role name is required",
-        "string.max": "Role name cannot exceed 50 characters",
-        "string.pattern.base":
-          "Role name must start with a letter and contain only lowercase letters, numbers, and underscores",
-        "any.required": "Role name is required",
-      }),
-    description: Joi.string().max(255).optional().trim().messages({
-      "string.max": "Description cannot exceed 255 characters",
-    }),
-    permissions: Joi.array().items(Joi.string()).optional().messages({
-      "array.base": "Permissions must be an array of strings",
-    }),
-  }),
+  buildCompositeSchema('createRole'),
 );
 
 /**
  * Role Update Validation
  * Validates: PUT /api/roles/:id
+ * USES CENTRALIZED SCHEMA from validation-rules.json
  */
 const validateRoleUpdate = createValidator(
-  Joi.object({
-    name: Joi.string()
-      .min(1)
-      .max(50)
-      .optional()
-      .trim()
-      .lowercase()
-      .pattern(/^[a-z][a-z0-9_]*$/)
-      .messages({
-        "string.empty": "Role name cannot be empty",
-        "string.max": "Role name cannot exceed 50 characters",
-        "string.pattern.base":
-          "Role name must start with a letter and contain only lowercase letters, numbers, and underscores",
-      }),
-    description: Joi.string().max(255).optional().trim().allow("").messages({
-      "string.max": "Description cannot exceed 255 characters",
-    }),
-    permissions: Joi.array().items(Joi.string()).optional().messages({
-      "array.base": "Permissions must be an array of strings",
-    }),
-  })
-    .min(1)
-    .messages({
-      "object.min": "At least one field must be provided for update",
-    }),
+  buildCompositeSchema('updateRole').min(1).messages({
+    'object.min': 'At least one field must be provided for update',
+  }),
 );
 
 /**
@@ -173,10 +103,69 @@ const validateRoleUpdate = createValidator(
 const validateRoleAssignment = createValidator(
   Joi.object({
     role_id: Joi.number().integer().positive().required().messages({
-      "number.base": "Role ID must be a number",
-      "number.integer": "Role ID must be an integer",
-      "number.positive": "Role ID must be positive",
-      "any.required": "Role ID is required",
+      'number.base': 'Role ID must be a number',
+      'number.integer': 'Role ID must be an integer',
+      'number.positive': 'Role ID must be positive',
+      'any.required': 'Role ID is required',
+    }),
+  }),
+);
+
+/**
+ * Auth0 Callback Validation
+ * Validates: POST /api/auth0/callback
+ * Validates authorization code and redirect URI from Auth0 callback
+ */
+const validateAuthCallback = createValidator(
+  Joi.object({
+    code: Joi.string().required().trim().messages({
+      'string.empty': 'Authorization code is required',
+      'any.required': 'Authorization code is required',
+    }),
+    redirect_uri: Joi.string().uri().optional().trim().messages({
+      'string.uri': 'Redirect URI must be a valid URL',
+    }),
+  }),
+);
+
+/**
+ * Auth0 Token Validation
+ * Validates: POST /api/auth0/validate
+ * Validates Auth0 ID token for PKCE flow
+ */
+const validateAuth0Token = createValidator(
+  Joi.object({
+    id_token: Joi.string().required().trim().messages({
+      'string.empty': 'ID token is required',
+      'any.required': 'ID token is required',
+    }),
+  }),
+);
+
+/**
+ * Auth0 Refresh Token Validation
+ * Validates: POST /api/auth0/refresh
+ * Validates refresh token for Auth0 token refresh
+ */
+const validateAuth0Refresh = createValidator(
+  Joi.object({
+    refresh_token: Joi.string().required().trim().messages({
+      'string.empty': 'Refresh token is required',
+      'any.required': 'Refresh token is required',
+    }),
+  }),
+);
+
+/**
+ * Auth Refresh Token Validation
+ * Validates: POST /api/auth/refresh
+ * Validates refresh token for internal token refresh
+ */
+const validateRefreshToken = createValidator(
+  Joi.object({
+    refreshToken: Joi.string().required().trim().messages({
+      'string.empty': 'Refresh token is required',
+      'any.required': 'Refresh token is required',
     }),
   }),
 );
@@ -187,4 +176,8 @@ module.exports = {
   validateRoleAssignment,
   validateRoleCreate,
   validateRoleUpdate,
+  validateAuthCallback,
+  validateAuth0Token,
+  validateAuth0Refresh,
+  validateRefreshToken,
 };

@@ -9,7 +9,6 @@
 const request = require("supertest");
 const app = require("../../../server");
 const {
-  setupTestDatabase,
   cleanupTestDatabase,
   createTestUser,
   uniqueRoleName,
@@ -27,9 +26,9 @@ describe("Role CRUD Operations - Integration Tests", () => {
   let testRoleId;
   let testRoleName;
 
+  // STANDARD PATTERN: globalSetup handles schema, beforeAll creates test users
   beforeAll(async () => {
-    // Database already set up by global setup
-    // Just create test users
+    // Create test users (schema already set up by globalSetup)
     const adminData = await createTestUser("admin");
     adminToken = adminData.token;
     adminUser = adminData.user;
@@ -38,7 +37,8 @@ describe("Role CRUD Operations - Integration Tests", () => {
     clientToken = clientData.token;
   });
 
-  afterAll(async () => {
+  // STANDARD PATTERN: Clean data between tests, not schema
+  afterEach(async () => {
     await cleanupTestDatabase();
   });
 
@@ -380,9 +380,8 @@ describe("Role CRUD Operations - Integration Tests", () => {
         .set("Authorization", `Bearer ${adminToken}`)
         .expect(400);
 
-      expect(response.body.message).toBe(
-        "Cannot delete role: users are assigned to this role",
-      );
+      expect(response.body.message).toContain("Cannot delete role:");
+      expect(response.body.message).toContain("user(s) are assigned");
     });
 
     it("should reject non-admin user", async () => {

@@ -29,30 +29,17 @@ setTestEnv({
 // Global test timeout (integration tests need more time)
 jest.setTimeout(30000);
 
-// Global setup before all tests
-beforeAll(async () => {
-  testLogger.log("🧪 Starting TrossApp integration test suite...");
-  testLogger.log("📦 Setting up test database...");
+// Note: Database setup is now handled by globalSetup (jest.global.setup.js)
+// This runs ONCE before all test files, preventing race conditions
 
-  try {
-    await setupTestDatabase();
-    testLogger.log("✅ Test database ready");
-  } catch (error) {
-    testLogger.error("❌ Test database setup failed:", error.message);
-    testLogger.error(
-      "💡 Make sure test database is running: npm run db:test:start",
-    );
-    throw error;
-  }
+// Global setup before each test FILE (not each test)
+beforeAll(async () => {
+  testLogger.log("🧪 Integration test file starting...");
 });
 
-// Global cleanup after all tests
-// NOTE: We DON'T call teardownTestDatabase() here because it would close
-// the pool after the first test file completes, breaking subsequent files.
-// The pool will be cleaned up automatically when Jest exits, or you can
-// manually close it with: npm run db:test:stop
+// Global cleanup after each test FILE
 afterAll(async () => {
-  testLogger.log("✅ Test file completed");
+  testLogger.log("✅ Integration test file completed");
   cleanupTestEnv();
 });
 

@@ -106,7 +106,7 @@ class AuthTestPanel extends StatelessWidget {
                     color: AppColors.brandPrimary,
                   ),
                   SizedBox(width: spacing.md),
-                  Expanded(
+                  Flexible(
                     child: Text(
                       'Validates authentication system and role-based access control. Tests: system health, token auth, user profile retrieval, and admin permissions.',
                       style: theme.textTheme.bodyMedium?.copyWith(
@@ -268,7 +268,7 @@ class AuthTestPanel extends StatelessWidget {
                                 : AppColors.grey500,
                           ),
                           SizedBox(width: spacing.sm),
-                          Expanded(
+                          Flexible(
                             child: Text(
                               result.replaceAll(RegExp(r'^[✅❌ℹ️]\s*'), ''),
                               style: theme.textTheme.bodySmall?.copyWith(

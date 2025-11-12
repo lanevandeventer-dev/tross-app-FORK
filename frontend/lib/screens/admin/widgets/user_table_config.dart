@@ -6,13 +6,15 @@ library;
 
 import 'package:flutter/material.dart';
 import '../../../models/user_model.dart';
-import '../../../config/table_column.dart';
-import '../../../widgets/atoms/atoms.dart';
+import '../../../config/config.dart';
+import '../../../utils/table_cell_builders.dart';
+import '../../../services/user_service.dart';
 
 class UserTableConfig {
   /// Get column definitions for user table
   static List<TableColumn<User>> getColumns({
     List<Widget> Function(User)? actionsBuilder,
+    VoidCallback? onUserUpdated,
   }) {
     return [
       // Name column - reasonable width, not excessive
@@ -20,9 +22,8 @@ class UserTableConfig {
         id: 'name',
         label: 'Name',
         sortable: true,
-        width: 2, // Flex ratio: reasonable width for names
-        cellBuilder: (user) =>
-            DataValue(text: user.fullName, emphasis: ValueEmphasis.primary),
+        width: 2,
+        cellBuilder: (user) => TableCellBuilders.textCell(user.fullName),
         comparator: (a, b) => a.fullName.compareTo(b.fullName),
       ),
 
@@ -31,8 +32,8 @@ class UserTableConfig {
         id: 'email',
         label: 'Email',
         sortable: true,
-        width: 2.5, // Flex ratio: slightly wider for emails (needs more chars)
-        cellBuilder: (user) => DataValue.email(user.email),
+        width: 2.5,
+        cellBuilder: (user) => TableCellBuilders.emailCell(user.email),
         comparator: (a, b) => a.email.compareTo(b.email),
       ),
 
@@ -41,21 +42,28 @@ class UserTableConfig {
         id: 'role',
         label: 'Role',
         sortable: true,
-        width: 1.2, // Flex ratio: compact but readable
-        cellBuilder: (user) => StatusBadge.role(user.role),
+        width: 1.2,
+        cellBuilder: (user) => TableCellBuilders.roleBadgeCell(user.role),
         comparator: (a, b) => a.role.compareTo(b.role),
       ),
 
-      // Status column - compact for badges
+      // Status column - compact for badges + inline editing
       TableColumn<User>(
         id: 'status',
         label: 'Status',
         sortable: true,
-        width: 1, // Flex ratio: compact for status badges
-        cellBuilder: (user) => StatusBadge(
-          label: user.isActive ? 'Active' : 'Inactive',
-          style: user.isActive ? BadgeStyle.success : BadgeStyle.neutral,
-          compact: true,
+        width: 1.5,
+        cellBuilder: (user) => TableCellBuilders.editableBooleanCell<User>(
+          item: user,
+          value: user.isActive,
+          onUpdate: (newValue) async {
+            await UserService.updateUser(user.id, isActive: newValue);
+            return true;
+          },
+          onChanged: onUserUpdated,
+          fieldName: 'user status',
+          trueAction: 'activate this user',
+          falseAction: 'deactivate this user',
         ),
         comparator: (a, b) => a.isActive == b.isActive
             ? 0
@@ -69,27 +77,10 @@ class UserTableConfig {
         id: 'created',
         label: 'Created',
         sortable: true,
-        width: 1.5, // Flex ratio: compact for dates
-        cellBuilder: (user) => DataValue.timestamp(user.createdAt),
+        width: 1.5,
+        cellBuilder: (user) => TableCellBuilders.timestampCell(user.createdAt),
         comparator: (a, b) => a.createdAt.compareTo(b.createdAt),
       ),
     ];
-  }
-
-  /// Filter users by search query
-  static List<User> filterUsers(List<User> users, String query) {
-    if (query.isEmpty) return users;
-
-    final lowerQuery = query.toLowerCase();
-    return users.where((user) {
-      return user.fullName.toLowerCase().contains(lowerQuery) ||
-          user.email.toLowerCase().contains(lowerQuery) ||
-          user.role.toLowerCase().contains(lowerQuery);
-    }).toList();
-  }
-
-  /// Get default sort (by name ascending)
-  static int defaultSort(User a, User b) {
-    return a.fullName.compareTo(b.fullName);
   }
 }

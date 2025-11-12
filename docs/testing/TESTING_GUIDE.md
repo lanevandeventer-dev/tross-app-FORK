@@ -1,7 +1,6 @@
 # 🧪 TrossApp Testing Guide
 
-**Last Updated:** October 17, 2025  
-**Current Status:** 313/313 unit tests passing (100%), 2 integration tests need fixes
+**Comprehensive testing philosophy, patterns, and best practices for TrossApp**
 
 ---
 
@@ -26,7 +25,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ 1. UNIT TESTS (Fast, Isolated) - 313 tests ✅              │
+│ 1. UNIT TESTS (Fast, Isolated)                             │
 │    - Pure functions (JWT, bcrypt, validation)               │
 │    - Business logic and utilities                           │
 │    - Mock ONLY external APIs (Auth0)                        │
@@ -34,7 +33,7 @@
 └─────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────┐
-│ 2. INTEGRATION TESTS (Medium, Real DB) - 84 tests ✅       │
+│ 2. INTEGRATION TESTS (Medium, Real DB)                     │
 │    - Test with REAL PostgreSQL test database               │
 │    - Verify SQL queries actually work                       │
 │    - Test transactions, constraints, indexes                │
@@ -42,7 +41,7 @@
 └─────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────┐
-│ 3. E2E TESTS (Slow, Full Stack) - Playwright               │
+│ 3. E2E TESTS (Slow, Full Stack)                            │
 │    - Test complete user flows                               │
 │    - Frontend + Backend + Database                          │
 │    Speed: 5-30s    Coverage: User stories                   │
@@ -60,26 +59,26 @@ backend/__tests__/
 ├── unit/                          # Fast, isolated tests
 │   ├── db/
 │   │   ├── models/
-│   │   │   ├── Role.test.js      ✅ 58 tests (100% coverage)
-│   │   │   └── User.test.js      ✅ 53 tests (100% coverage)
+│   │   │   ├── Role.test.js      # Role model tests
+│   │   │   └── User.test.js      # User model tests
 │   ├── routes/
-│   │   ├── auth.test.js          ✅ 45 tests (100% coverage)
-│   │   ├── roles.test.js         ✅ 41 tests (100% coverage)
-│   │   └── users.test.js         ✅ 27 tests (100% coverage)
+│   │   ├── auth.test.js          # Auth route tests
+│   │   ├── roles.test.js         # Role route tests
+│   │   └── users.test.js         # User route tests
 │   ├── services/
-│   │   ├── audit-service.test.js ✅ 73 tests (100% coverage)
+│   │   ├── audit-service.test.js # Audit service tests
 │   │   └── token-service.test.js
 │   └── utils/
-│       └── request-helpers.test.js ✅ 16 tests (100% coverage)
+│       └── request-helpers.test.js # Helper utility tests
 │
 ├── integration/                   # Real database tests
 │   ├── db/
-│   │   ├── role-crud-db.test.js  ✅ 25 tests passing
-│   │   ├── user-crud-db.test.js  ⚠️ Needs fix (hanging)
-│   │   └── token-service-db.test.js ⚠️ Needs fix (setup issue)
+│   │   ├── role-crud-db.test.js  # Role CRUD with real DB
+│   │   ├── user-crud-db.test.js  # User CRUD with real DB
+│   │   └── token-service-db.test.js # Token service integration
 │   └── routes/
-│       ├── auth-flow.test.js     ✅ 13 tests passing
-│       └── user-role-assignment.test.js ✅ 11 tests passing
+│       ├── auth-flow.test.js     # Full auth flows
+│       └── user-role-assignment.test.js # User-role operations
 │
 ├── fixtures/                      # Test data
 │   └── test-data.js              # Shared fixtures
@@ -515,10 +514,11 @@ const User = require("@/db/models/User");
 - [Jest Documentation](https://jestjs.io/docs/getting-started)
 - [Supertest API](https://github.com/visionmedia/supertest)
 - [Testing Node.js + PostgreSQL](https://node-postgres.com/guides/testing)
-- [TrossApp Test Status](./TEST_STATUS.md) - Current test health
+- [TrossApp Testing Documentation](./README.md)
 
 ---
 
-**Last Updated:** October 17, 2025  
-**Maintainer:** TrossApp Team  
-**Version:** 2.0 (Consolidated from 7 docs)
+---
+
+**TrossApp Testing Guide** - Comprehensive testing philosophy and best practices
+

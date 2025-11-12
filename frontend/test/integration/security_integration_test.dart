@@ -41,9 +41,13 @@ void main() {
           findsOneWidget,
           reason: 'Dev mode should show dev login card',
         );
-        // Text appears in button labels (may appear multiple times)
-        expect(find.text('Login as Technician'), findsWidgets);
-        expect(find.text('Login as Admin'), findsWidgets);
+        // Dev card now uses dropdown with single "Dev Login" button
+        expect(find.text('Dev Login'), findsOneWidget);
+        expect(
+          find.text('Choose a role to test with'),
+          findsOneWidget,
+          reason: 'Dropdown helper text should be visible',
+        );
       } else {
         // In production, dev card should NOT exist
         expect(
@@ -51,8 +55,7 @@ void main() {
           findsNothing,
           reason: 'Production should hide dev login card',
         );
-        expect(find.text('Login as Technician'), findsNothing);
-        expect(find.text('Login as Admin'), findsNothing);
+        expect(find.text('Dev Login'), findsNothing);
       }
     });
 
@@ -147,14 +150,13 @@ void main() {
         // It's used in other screens - testing its existence separately
         expect(find.text('Developer Login'), findsOneWidget);
 
-        // Verify dev buttons are interactive (text may appear in multiple places)
-        expect(find.text('Login as Technician'), findsWidgets);
-        expect(find.text('Login as Admin'), findsWidgets);
+        // Dev card now uses dropdown with single "Dev Login" button (not per-role buttons)
+        expect(find.text('Dev Login'), findsOneWidget);
+        expect(find.text('Choose a role to test with'), findsOneWidget);
       } else {
         // Layer 1: UI hides dev features
         expect(find.text('Developer Login'), findsNothing);
-        expect(find.text('Login as Technician'), findsNothing);
-        expect(find.text('Login as Admin'), findsNothing);
+        expect(find.text('Dev Login'), findsNothing);
       }
     });
 

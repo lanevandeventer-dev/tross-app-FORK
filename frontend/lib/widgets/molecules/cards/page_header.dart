@@ -47,8 +47,10 @@ class PageHeader extends StatelessWidget {
     final spacing = context.spacing;
 
     return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
+        Flexible(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -80,7 +82,7 @@ class PageHeader extends StatelessWidget {
             ],
           ),
         ),
-        if (action != null) action!,
+        if (action != null) ...[SizedBox(width: spacing.md), action!],
       ],
     );
   }

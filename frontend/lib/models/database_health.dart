@@ -1,9 +1,32 @@
 /// Database Health Data Model
 ///
 /// Models for database health monitoring data from /api/health/databases
+/// Last synced: 2025-11-07 (Added defensive validation + moved HealthStatus enum)
+///
+/// DEFENSIVE: Validates all API response data with toSafe*() validators
+/// Philosophy: Never trust external data - validate at every boundary
 library;
 
-import '../widgets/atoms/indicators/connection_status_badge.dart';
+import '../utils/validators.dart';
+
+/// Health/Connection status states
+///
+/// Used for database health monitoring and any service health checks.
+/// Moved from connection_status_badge.dart for proper separation of concerns
+/// (model layer should not depend on widget layer).
+enum HealthStatus {
+  /// Service is fully operational
+  healthy,
+
+  /// Service is operational but degraded (slow, partial failure)
+  degraded,
+
+  /// Service is not operational
+  critical,
+
+  /// Status is unknown (loading, not yet checked)
+  unknown,
+}
 
 /// Individual database health information
 class DatabaseHealth {
@@ -39,16 +62,52 @@ class DatabaseHealth {
   });
 
   /// Create from JSON
+  ///
+  /// DEFENSIVE: Validates all fields with toSafe*() to prevent runtime crashes
+  /// Throws ArgumentError with clear field name if data is invalid
   factory DatabaseHealth.fromJson(Map<String, dynamic> json) {
-    return DatabaseHealth(
-      name: json['name'] as String,
-      status: _parseStatus(json['status'] as String),
-      responseTime: json['responseTime'] as int,
-      connectionCount: json['connectionCount'] as int,
-      maxConnections: json['maxConnections'] as int,
-      lastChecked: json['lastChecked'] as String,
-      errorMessage: json['errorMessage'] as String?,
-    );
+    try {
+      return DatabaseHealth(
+        name: Validators.toSafeString(
+          json['name'],
+          'database_health.name',
+          minLength: 1,
+        )!,
+        status: _parseStatus(
+          Validators.toSafeString(json['status'], 'database_health.status')!,
+        ),
+        responseTime: Validators.toSafeInt(
+          json['responseTime'],
+          'database_health.responseTime',
+          min: 0,
+        )!,
+        connectionCount: Validators.toSafeInt(
+          json['connectionCount'],
+          'database_health.connectionCount',
+          min: 0,
+        )!,
+        maxConnections: Validators.toSafeInt(
+          json['maxConnections'],
+          'database_health.maxConnections',
+          min: 1,
+        )!,
+        lastChecked: Validators.toSafeString(
+          json['lastChecked'],
+          'database_health.lastChecked',
+        )!,
+        errorMessage: json['errorMessage'] != null
+            ? Validators.toSafeString(
+                json['errorMessage'],
+                'database_health.errorMessage',
+              )
+            : null,
+      );
+    } catch (e) {
+      // Re-throw with context for debugging
+      throw ArgumentError(
+        'Failed to parse DatabaseHealth from JSON: $e\nJSON: $json',
+      );
+    }
   }
 
   /// Convert to JSON
@@ -150,13 +209,33 @@ class DatabasesHealthResponse {
   });
 
   /// Create from JSON
+  ///
+  /// DEFENSIVE: Validates all fields with toSafe*() to prevent runtime crashes
+  /// Throws ArgumentError with clear field name if data is invalid
   factory DatabasesHealthResponse.fromJson(Map<String, dynamic> json) {
-    return DatabasesHealthResponse(
-      databases: (json['databases'] as List)
-          .map((db) => DatabaseHealth.fromJson(db as Map<String, dynamic>))
-          .toList(),
-      timestamp: json['timestamp'] as String,
-    );
+    try {
+      // Validate databases array exists and is a list
+      if (!json.containsKey('databases') || json['databases'] is! List) {
+        throw ArgumentError(
+          'databases_health_response.databases must be a list',
+        );
+      }
+
+      return DatabasesHealthResponse(
+        databases: (json['databases'] as List)
+            .map((db) => DatabaseHealth.fromJson(db as Map<String, dynamic>))
+            .toList(),
+        timestamp: Validators.toSafeString(
+          json['timestamp'],
+          'databases_health_response.timestamp',
+        )!,
+      );
+    } catch (e) {
+      // Re-throw with context for debugging
+      throw ArgumentError(
+        'Failed to parse DatabasesHealthResponse from JSON: $e\nJSON: $json',
+      );
+    }
   }
 
   /// Convert to JSON

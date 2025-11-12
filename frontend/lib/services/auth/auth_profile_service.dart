@@ -1,8 +1,12 @@
-// Auth Profile Service - User profile and role management
-//
-// DEFENSIVE: Validates all API response data before use
-// Philosophy: Never trust external data - validate at EVERY boundary
+/// Auth Profile Service
+///
+/// Handles user profile operations and validation
+/// Integrates with backend /api/auth/me endpoint
+library;
+
+import '../../config/permissions.dart';
 import '../../config/api_endpoints.dart';
+import '../../utils/helpers/string_helper.dart';
 import '../api_client.dart';
 import '../error_service.dart';
 import '../../utils/validators.dart';
@@ -203,19 +207,47 @@ class AuthProfileService {
     return validated;
   }
 
-  /// Check if user has specific role
+  /// Check if user has specific role (exact match)
   static bool hasRole(Map<String, dynamic>? user, String roleName) {
-    return user?['role'] == roleName;
+    return StringHelper.toLowerCase(user?['role']) ==
+        StringHelper.toLowerCase(roleName);
   }
 
   /// Check if user is admin
   static bool isAdmin(Map<String, dynamic>? user) {
-    return hasRole(user, 'admin');
+    return PermissionService.isAdmin(user?['role']);
   }
 
-  /// Check if user is technician
+  /// Check if user is manager or above
+  static bool isManager(Map<String, dynamic>? user) {
+    return PermissionService.isManager(user?['role']);
+  }
+
+  /// Check if user is dispatcher or above
+  static bool isDispatcher(Map<String, dynamic>? user) {
+    return PermissionService.isDispatcher(user?['role']);
+  }
+
+  /// Check if user is technician or above
   static bool isTechnician(Map<String, dynamic>? user) {
-    return hasRole(user, 'technician');
+    return PermissionService.isTechnician(user?['role']);
+  }
+
+  /// Check if user has permission to perform operation on resource
+  static bool canPerform(
+    Map<String, dynamic>? user,
+    String resource,
+    String operation,
+  ) {
+    return PermissionService.canPerform(user?['role'], resource, operation);
+  }
+
+  /// Check if user meets minimum role requirement
+  static bool meetsMinimumRole(
+    Map<String, dynamic>? user,
+    String requiredRole,
+  ) {
+    return PermissionService.meetsMinimumRole(user?['role'], requiredRole);
   }
 
   /// Get user's display name

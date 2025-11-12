@@ -10,9 +10,9 @@ const {
   toSafeInteger,
   toSafeBoolean,
   toSafePagination,
-} = require("./type-coercion");
-const { HTTP_STATUS } = require("../config/constants");
-const { logValidationFailure } = require("./validation-logger");
+} = require('./type-coercion');
+const { HTTP_STATUS } = require('../config/constants');
+const { logValidationFailure } = require('./validation-logger');
 
 /**
  * Create a standard validation error response
@@ -24,7 +24,7 @@ const { logValidationFailure } = require("./validation-logger");
  */
 function createValidationError(message, field) {
   return {
-    error: "Validation Error",
+    error: 'Validation Error',
     message,
     field,
     timestamp: new Date().toISOString(),
@@ -48,14 +48,14 @@ function validatePagination(limits = { defaultLimit: 50, maxLimit: 200 }) {
     try {
       const pagination = toSafePagination(req.query, limits);
 
-      if (!req.validated) req.validated = {};
+      if (!req.validated) {req.validated = {};}
       req.validated.pagination = pagination;
 
       next();
     } catch (error) {
       logValidationFailure({
-        validator: "validatePagination",
-        field: "pagination",
+        validator: 'validatePagination',
+        field: 'pagination',
         value: req.query,
         reason: error.message,
         context: { url: req.url, method: req.method },
@@ -63,7 +63,7 @@ function validatePagination(limits = { defaultLimit: 50, maxLimit: 200 }) {
 
       return res
         .status(HTTP_STATUS.BAD_REQUEST)
-        .json(createValidationError(error.message, "pagination"));
+        .json(createValidationError(error.message, 'pagination'));
     }
   };
 }
@@ -85,15 +85,15 @@ function validateSearch(options = {}) {
   const { minLength = 1, maxLength = 255, required = false } = options;
 
   return (req, res, next) => {
-    const search = req.query.search || req.query.q || "";
+    const search = req.query.search || req.query.q || '';
 
     if (!search && required) {
       return res
         .status(HTTP_STATUS.BAD_REQUEST)
-        .json(createValidationError("Search query is required", "search"));
+        .json(createValidationError('Search query is required', 'search'));
     }
 
-    if (search && typeof search === "string") {
+    if (search && typeof search === 'string') {
       const trimmed = search.trim();
 
       if (trimmed.length < minLength) {
@@ -102,7 +102,7 @@ function validateSearch(options = {}) {
           .json(
             createValidationError(
               `Search query must be at least ${minLength} characters`,
-              "search",
+              'search',
             ),
           );
       }
@@ -113,13 +113,13 @@ function validateSearch(options = {}) {
           .json(
             createValidationError(
               `Search query cannot exceed ${maxLength} characters`,
-              "search",
+              'search',
             ),
           );
       }
 
-      if (!req.validated) req.validated = {};
-      if (!req.validated.query) req.validated.query = {};
+      if (!req.validated) {req.validated = {};}
+      if (!req.validated.query) {req.validated.query = {};}
       req.validated.query.search = trimmed;
     }
 
@@ -142,10 +142,10 @@ function validateSearch(options = {}) {
 function validateSort(
   allowedFields,
   defaultField = null,
-  defaultOrder = "asc",
+  defaultOrder = 'asc',
 ) {
   if (!allowedFields || allowedFields.length === 0) {
-    throw new Error("validateSort requires at least one allowed field");
+    throw new Error('validateSort requires at least one allowed field');
   }
 
   const defaultSortField = defaultField || allowedFields[0];
@@ -161,10 +161,10 @@ function validateSort(
     // Validate sortBy
     if (!allowedFields.includes(sortBy)) {
       logValidationFailure({
-        validator: "validateSort",
-        field: "sortBy",
+        validator: 'validateSort',
+        field: 'sortBy',
         value: sortBy,
-        reason: `Field not in allowed list: ${allowedFields.join(", ")}`,
+        reason: `Field not in allowed list: ${allowedFields.join(', ')}`,
         context: { url: req.url, method: req.method },
       });
 
@@ -172,17 +172,17 @@ function validateSort(
         .status(HTTP_STATUS.BAD_REQUEST)
         .json(
           createValidationError(
-            `sortBy must be one of: ${allowedFields.join(", ")}`,
-            "sortBy",
+            `sortBy must be one of: ${allowedFields.join(', ')}`,
+            'sortBy',
           ),
         );
     }
 
     // Validate sortOrder
-    if (!["asc", "desc"].includes(sortOrder)) {
+    if (!['asc', 'desc'].includes(sortOrder)) {
       logValidationFailure({
-        validator: "validateSort",
-        field: "sortOrder",
+        validator: 'validateSort',
+        field: 'sortOrder',
         value: sortOrder,
         reason: 'Must be "asc" or "desc"',
         context: { url: req.url, method: req.method },
@@ -193,13 +193,13 @@ function validateSort(
         .json(
           createValidationError(
             'sortOrder must be "asc" or "desc"',
-            "sortOrder",
+            'sortOrder',
           ),
         );
     }
 
-    if (!req.validated) req.validated = {};
-    if (!req.validated.query) req.validated.query = {};
+    if (!req.validated) {req.validated = {};}
+    if (!req.validated.query) {req.validated.query = {};}
     req.validated.query.sortBy = sortBy;
     req.validated.query.sortOrder = sortOrder;
 
@@ -231,26 +231,26 @@ function validateFilters(filterSchema) {
         const value = req.query[key];
 
         // Skip if not provided (filters are optional)
-        if (value === undefined) continue;
+        if (value === undefined) {continue;}
 
         // Validate based on type
-        if (config.type === "integer") {
+        if (config.type === 'integer') {
           filters[key] = toSafeInteger(value, key, {
             min: config.min,
             max: config.max,
             allowNull: false,
           });
-        } else if (config.type === "boolean") {
+        } else if (config.type === 'boolean') {
           filters[key] = toSafeBoolean(value, key);
-        } else if (config.type === "string") {
-          if (typeof value !== "string") {
+        } else if (config.type === 'string') {
+          if (typeof value !== 'string') {
             throw new Error(`${key} must be a string`);
           }
 
           // Check allowed values
           if (config.allowed && !config.allowed.includes(value)) {
             throw new Error(
-              `${key} must be one of: ${config.allowed.join(", ")}`,
+              `${key} must be one of: ${config.allowed.join(', ')}`,
             );
           }
 
@@ -258,15 +258,15 @@ function validateFilters(filterSchema) {
         }
       }
 
-      if (!req.validated) req.validated = {};
-      if (!req.validated.query) req.validated.query = {};
+      if (!req.validated) {req.validated = {};}
+      if (!req.validated.query) {req.validated.query = {};}
       req.validated.query.filters = filters;
 
       next();
     } catch (error) {
       logValidationFailure({
-        validator: "validateFilters",
-        field: "filters",
+        validator: 'validateFilters',
+        field: 'filters',
         value: req.query,
         reason: error.message,
         context: { url: req.url, method: req.method },
@@ -274,7 +274,127 @@ function validateFilters(filterSchema) {
 
       return res
         .status(HTTP_STATUS.BAD_REQUEST)
-        .json(createValidationError(error.message, "filters"));
+        .json(createValidationError(error.message, 'filters'));
+    }
+  };
+}
+
+/**
+ * Validate query parameters using model metadata
+ * Contract v2.0: Metadata-driven validation (ZERO hardcoding!)
+ *
+ * Usage:
+ *   const userMetadata = require('../config/models/user-metadata');
+ *   router.get('/', validateQuery(userMetadata), handler);
+ *   // Access: req.validated.query.search, req.validated.query.filters,
+ *   //         req.validated.query.sortBy, req.validated.query.sortOrder
+ *
+ * @param {Object} metadata - Model metadata from config/models
+ * @param {string[]} metadata.searchableFields - Fields that can be searched
+ * @param {string[]} metadata.filterableFields - Fields that can be filtered
+ * @param {string[]} metadata.sortableFields - Fields that can be sorted
+ * @param {Object} metadata.defaultSort - Default sort configuration
+ * @returns {Function} Express middleware
+ */
+function validateQuery(metadata) {
+  const {
+    searchableFields: _searchableFields = [],
+    filterableFields = [],
+    sortableFields = [],
+    defaultSort: _defaultSort = { field: 'id', order: 'ASC' },
+  } = metadata;
+
+  return (req, res, next) => {
+    try {
+      if (!req.validated) {req.validated = {};}
+      if (!req.validated.query) {req.validated.query = {};}
+
+      // Validate search (optional)
+      const search = req.query.search || req.query.q;
+      if (search && typeof search === 'string') {
+        const trimmed = search.trim();
+        if (trimmed.length > 255) {
+          return res.status(HTTP_STATUS.BAD_REQUEST).json(
+            createValidationError('Search query cannot exceed 255 characters', 'search'),
+          );
+        }
+        req.validated.query.search = trimmed.length > 0 ? trimmed : undefined;
+      }
+
+      // Validate filters (optional, accept ANY filterable field)
+      const filters = {};
+      for (const field of filterableFields) {
+        // Support both direct filters and operator-based filters
+        // e.g., ?role_id=2 or ?priority[gte]=50
+        const directValue = req.query[field];
+        if (directValue !== undefined) {
+          filters[field] = directValue;
+        }
+
+        // Check for operator-based filters (field[operator]=value)
+        const operators = ['gt', 'gte', 'lt', 'lte', 'in', 'not'];
+        for (const op of operators) {
+          const opKey = `${field}[${op}]`;
+          if (req.query[opKey] !== undefined) {
+            if (!filters[field]) {filters[field] = {};}
+            if (typeof filters[field] === 'object' && !Array.isArray(filters[field])) {
+              filters[field][op] = req.query[opKey];
+            } else {
+              // If direct value exists, create object
+              const directVal = filters[field];
+              filters[field] = { [op]: req.query[opKey] };
+              if (directVal !== undefined) {
+                filters[field].eq = directVal;
+              }
+            }
+          }
+        }
+      }
+      req.validated.query.filters = Object.keys(filters).length > 0 ? filters : undefined;
+
+      // Validate sort (optional)
+      const sortBy = req.query.sortBy || req.query.sort;
+      const sortOrder = req.query.sortOrder || req.query.order;
+
+      if (sortBy && !sortableFields.includes(sortBy)) {
+        logValidationFailure({
+          validator: 'validateQuery',
+          field: 'sortBy',
+          value: sortBy,
+          reason: `Field not in sortable list: ${sortableFields.join(', ')}`,
+          context: { url: req.url, method: req.method },
+        });
+
+        return res.status(HTTP_STATUS.BAD_REQUEST).json(
+          createValidationError(
+            `sortBy must be one of: ${sortableFields.join(', ')}`,
+            'sortBy',
+          ),
+        );
+      }
+
+      if (sortOrder && !['asc', 'desc', 'ASC', 'DESC'].includes(sortOrder)) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json(
+          createValidationError('sortOrder must be "asc" or "desc"', 'sortOrder'),
+        );
+      }
+
+      req.validated.query.sortBy = sortBy;
+      req.validated.query.sortOrder = sortOrder;
+
+      next();
+    } catch (error) {
+      logValidationFailure({
+        validator: 'validateQuery',
+        field: 'query',
+        value: req.query,
+        reason: error.message,
+        context: { url: req.url, method: req.method },
+      });
+
+      return res.status(HTTP_STATUS.BAD_REQUEST).json(
+        createValidationError(error.message, 'query'),
+      );
     }
   };
 }
@@ -284,4 +404,5 @@ module.exports = {
   validateSearch,
   validateSort,
   validateFilters,
+  validateQuery, // NEW: Metadata-driven query validation
 };

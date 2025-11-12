@@ -24,31 +24,41 @@ describe("Role Model - CRUD Operations", () => {
   });
 
   describe("findAll()", () => {
-    it("should return all roles ordered by name", async () => {
+    it("should return paginated roles ordered by priority", async () => {
       const mockRoles = [
-        { id: 1, name: "admin", created_at: "2025-01-01" },
-        { id: 2, name: "client", created_at: "2025-01-02" },
-        { id: 3, name: "dispatcher", created_at: "2025-01-03" },
+        { id: 1, name: "admin", priority: 5, description: "Full system access", is_active: true, created_at: "2025-01-01" },
+        { id: 3, name: "dispatcher", priority: 3, description: "Medium access", is_active: true, created_at: "2025-01-03" },
+        { id: 2, name: "client", priority: 1, description: "Basic access", is_active: true, created_at: "2025-01-02" },
       ];
 
-      db.query.mockResolvedValue({ rows: mockRoles });
+      db.query
+        .mockResolvedValueOnce({ rows: [{ total: 3 }] }) // count query
+        .mockResolvedValueOnce({ rows: mockRoles }); // data query
 
-      const result = await Role.findAll();
+      const result = await Role.findAll({ page: 1, limit: 50 });
 
-      expect(result).toEqual(mockRoles);
-      expect(db.query).toHaveBeenCalledWith(
-        "SELECT id, name, created_at FROM roles ORDER BY name",
-      );
-      expect(db.query).toHaveBeenCalledTimes(1);
+      expect(result.data).toEqual(mockRoles);
+      expect(result.pagination).toEqual({
+        page: 1,
+        limit: 50,
+        total: 3,
+        totalPages: 1,
+        hasNext: false,
+        hasPrev: false,
+      });
+      expect(db.query).toHaveBeenCalledTimes(2); // count + data
     });
 
-    it("should return empty array when no roles exist", async () => {
-      db.query.mockResolvedValue({ rows: [] });
+    it("should return empty data array when no roles exist", async () => {
+      db.query
+        .mockResolvedValueOnce({ rows: [{ total: 0 }] }) // count query
+        .mockResolvedValueOnce({ rows: [] }); // data query
 
       const result = await Role.findAll();
 
-      expect(result).toEqual([]);
-      expect(db.query).toHaveBeenCalledTimes(1);
+      expect(result.data).toEqual([]);
+      expect(result.pagination.total).toBe(0);
+      expect(db.query).toHaveBeenCalledTimes(2);
     });
 
     it("should handle database errors", async () => {
@@ -56,7 +66,7 @@ describe("Role Model - CRUD Operations", () => {
       db.query.mockRejectedValue(dbError);
 
       await expect(Role.findAll()).rejects.toThrow(
-        "Database connection failed",
+        "Failed to retrieve roles",
       );
       expect(db.query).toHaveBeenCalledTimes(1);
     });
@@ -64,14 +74,14 @@ describe("Role Model - CRUD Operations", () => {
 
   describe("findById()", () => {
     it("should return role by ID", async () => {
-      const mockRole = { id: 1, name: "admin", created_at: "2025-01-01" };
+      const mockRole = { id: 1, name: "admin", priority: 5, description: "Full system access", created_at: "2025-01-01" };
       db.query.mockResolvedValue({ rows: [mockRole] });
 
       const result = await Role.findById(1);
 
       expect(result).toEqual(mockRole);
       expect(db.query).toHaveBeenCalledWith(
-        "SELECT id, name, created_at FROM roles WHERE id = $1",
+        "SELECT * FROM roles WHERE id = $1",
         [1],
       );
       expect(db.query).toHaveBeenCalledTimes(1);
@@ -84,7 +94,7 @@ describe("Role Model - CRUD Operations", () => {
 
       expect(result).toBeUndefined();
       expect(db.query).toHaveBeenCalledWith(
-        "SELECT id, name, created_at FROM roles WHERE id = $1",
+        "SELECT * FROM roles WHERE id = $1",
         [999],
       );
     });
@@ -113,14 +123,14 @@ describe("Role Model - CRUD Operations", () => {
 
   describe("getByName()", () => {
     it("should return role by name (case-sensitive query)", async () => {
-      const mockRole = { id: 1, name: "admin", created_at: "2025-01-01" };
+      const mockRole = { id: 1, name: "admin", priority: 5, description: "Full system access", created_at: "2025-01-01" };
       db.query.mockResolvedValue({ rows: [mockRole] });
 
       const result = await Role.getByName("admin");
 
       expect(result).toEqual(mockRole);
       expect(db.query).toHaveBeenCalledWith(
-        "SELECT id, name, created_at FROM roles WHERE name = $1",
+        "SELECT * FROM roles WHERE name = $1",
         ["admin"],
       );
     });
@@ -153,10 +163,11 @@ describe("Role Model - CRUD Operations", () => {
   });
 
   describe("create()", () => {
-    it("should create new role with normalized name", async () => {
+    it("should create new role with normalized name and default priority", async () => {
       const mockCreatedRole = {
         id: 4,
         name: "dispatcher",
+        priority: 50,
         created_at: "2025-01-04",
       };
       db.query.mockResolvedValue({ rows: [mockCreatedRole] });
@@ -165,8 +176,8 @@ describe("Role Model - CRUD Operations", () => {
 
       expect(result).toEqual(mockCreatedRole);
       expect(db.query).toHaveBeenCalledWith(
-        expect.stringContaining("INSERT INTO roles"),
-        ["dispatcher"], // Normalized to lowercase
+        expect.stringContaining("INSERT INTO roles (name, priority)"),
+        ["dispatcher", 50], // Normalized to lowercase, default priority
       );
     });
 
@@ -174,26 +185,28 @@ describe("Role Model - CRUD Operations", () => {
       const mockCreatedRole = {
         id: 5,
         name: "manager",
+        priority: 50,
         created_at: "2025-01-05",
       };
       db.query.mockResolvedValue({ rows: [mockCreatedRole] });
 
       await Role.create("MANAGER");
 
-      expect(db.query).toHaveBeenCalledWith(expect.any(String), ["manager"]);
+      expect(db.query).toHaveBeenCalledWith(expect.any(String), ["manager", 50]);
     });
 
     it("should trim whitespace from role name", async () => {
       const mockCreatedRole = {
         id: 6,
         name: "technician",
+        priority: 50,
         created_at: "2025-01-06",
       };
       db.query.mockResolvedValue({ rows: [mockCreatedRole] });
 
       await Role.create("  Technician  ");
 
-      expect(db.query).toHaveBeenCalledWith(expect.any(String), ["technician"]);
+      expect(db.query).toHaveBeenCalledWith(expect.any(String), ["technician", 50]);
     });
   });
 
@@ -215,19 +228,19 @@ describe("Role Model - CRUD Operations", () => {
         .mockResolvedValueOnce({ rows: [existingRole] }) // findById
         .mockResolvedValueOnce({ rows: [updatedRole] }); // UPDATE query
 
-      const result = await Role.update(4, "Senior_Dispatcher");
+      const result = await Role.update(4, { name: "Senior_Dispatcher" });
 
       expect(result).toEqual(updatedRole);
       expect(db.query).toHaveBeenCalledTimes(2);
       expect(db.query).toHaveBeenNthCalledWith(
         1,
-        "SELECT id, name, created_at FROM roles WHERE id = $1",
+        "SELECT * FROM roles WHERE id = $1",
         [4],
       );
       expect(db.query).toHaveBeenNthCalledWith(
         2,
         expect.stringContaining("UPDATE roles"),
-        [4, "senior_dispatcher"],
+        ["senior_dispatcher", 4],
       );
     });
 
@@ -247,11 +260,11 @@ describe("Role Model - CRUD Operations", () => {
         .mockResolvedValueOnce({ rows: [existingRole] })
         .mockResolvedValueOnce({ rows: [updatedRole] });
 
-      await Role.update(4, "LEAD_DISPATCHER");
+      await Role.update(4, { name: "LEAD_DISPATCHER" });
 
       expect(db.query).toHaveBeenNthCalledWith(2, expect.any(String), [
-        4,
         "lead_dispatcher",
+        4,
       ]);
     });
 
@@ -271,12 +284,79 @@ describe("Role Model - CRUD Operations", () => {
         .mockResolvedValueOnce({ rows: [existingRole] })
         .mockResolvedValueOnce({ rows: [updatedRole] });
 
-      await Role.update(4, "  Field_Technician  ");
+      await Role.update(4, { name: "  Field_Technician  " });
 
       expect(db.query).toHaveBeenNthCalledWith(2, expect.any(String), [
-        4,
         "field_technician",
+        4,
       ]);
+    });
+
+    // Contract v2.0: update() no longer auto-manages audit fields
+    // Audit logging happens via AuditService (tested separately in deactivate/reactivate methods)
+    it("should update is_active field without audit fields", async () => {
+      const existingRole = {
+        id: 4,
+        name: "dispatcher",
+        is_active: true,
+        created_at: "2025-01-04",
+      };
+      const updatedRole = {
+        id: 4,
+        name: "dispatcher",
+        is_active: false,
+      };
+
+      db.query
+        .mockResolvedValueOnce({ rows: [existingRole] })
+        .mockResolvedValueOnce({ rows: [updatedRole] });
+
+      const result = await Role.update(4, { is_active: false });
+
+      expect(result).toEqual(updatedRole);
+      expect(db.query).toHaveBeenNthCalledWith(2, expect.any(String), [
+        false, // is_active
+        4, // role id
+      ]);
+    });
+
+    it("should update multiple fields including is_active", async () => {
+      const existingRole = {
+        id: 4,
+        name: "dispatcher",
+        description: "Old description",
+        is_active: true,
+        created_at: "2025-01-04",
+      };
+      // Contract v2.0: No deactivated_at/by fields
+      const updatedRole = {
+        id: 4,
+        name: "senior_dispatcher",
+        description: "New description",
+        is_active: false,
+      };
+
+      db.query
+        .mockResolvedValueOnce({ rows: [existingRole] })
+        .mockResolvedValueOnce({ rows: [updatedRole] });
+
+      const result = await Role.update(4, {
+        name: "Senior_Dispatcher",
+        description: "New description",
+        is_active: false,
+      });
+
+      expect(result).toEqual(updatedRole);
+      expect(db.query).toHaveBeenNthCalledWith(
+        2,
+        expect.stringContaining("UPDATE roles"),
+        expect.arrayContaining([
+          "senior_dispatcher", // normalized name
+          "New description",
+          false, // is_active
+          4, // role id
+        ]),
+      );
     });
   });
 
@@ -295,7 +375,11 @@ describe("Role Model - CRUD Operations", () => {
 
       const result = await Role.delete(4);
 
-      expect(result).toEqual(roleToDelete);
+      // Role.delete() now returns { role, affectedUsers }
+      expect(result).toEqual({
+        role: roleToDelete,
+        affectedUsers: 0,
+      });
       expect(db.query).toHaveBeenCalledTimes(3);
       expect(db.query).toHaveBeenNthCalledWith(
         2,
@@ -304,7 +388,7 @@ describe("Role Model - CRUD Operations", () => {
       );
       expect(db.query).toHaveBeenNthCalledWith(
         3,
-        "DELETE FROM roles WHERE id = $1 RETURNING id, name",
+        "DELETE FROM roles WHERE id = $1 RETURNING *",
         [4],
       );
     });

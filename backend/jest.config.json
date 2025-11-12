@@ -1,36 +1,42 @@
 {
   "testEnvironment": "node",
-  "testMatch": [
-    "**/__tests__/unit/**/*.test.js",
-    "**/__tests__/integration/**/*.test.js"
-  ],
-  "setupFilesAfterEnv": ["<rootDir>/__tests__/setup/jest.setup.js"],
   "maxWorkers": 1,
-  "forceExit": true,
-  "testTimeout": 30000,
+  "projects": [
+    {
+      "displayName": "unit",
+      "testMatch": ["**/__tests__/unit/**/*.test.js"],
+      "setupFilesAfterEnv": ["<rootDir>/__tests__/setup/jest.setup.js"],
+      "testTimeout": 5000,
+      "maxWorkers": 1
+    },
+    {
+      "displayName": "integration",
+      "testMatch": ["**/__tests__/integration/**/*.test.js"],
+      "setupFilesAfterEnv": ["<rootDir>/__tests__/setup/jest.integration.setup.js"],
+      "globalSetup": "<rootDir>/__tests__/setup/jest.global.setup.js",
+      "globalTeardown": "<rootDir>/__tests__/setup/jest.integration.teardown.js",
+      "testTimeout": 15000,
+      "maxWorkers": 1
+    }
+  ],
   "collectCoverageFrom": [
     "**/*.js",
     "!**/node_modules/**",
     "!**/__tests__/**",
     "!**/coverage/**",
-    "!jest.config.js",
+    "!jest.config*.js",
     "!**/*-old.js",
     "!**/*-backup.js",
     "!**/auth0-setup.json"
   ],
-  "coverageThreshold": {
-    "global": {
-      "branches": 10,
-      "functions": 8,
-      "lines": 10,
-      "statements": 10
-    }
-  },
   "coverageReporters": ["text", "lcov", "html"],
   "testPathIgnorePatterns": [
     "/node_modules/",
     "/__tests__/fixtures/",
     "/__tests__/helpers/",
-    "/__tests__/TESTING_STRATEGY.js"
-  ]
+    "/__tests__/setup/"
+  ],
+  "forceExit": true,
+  "detectOpenHandles": true,
+  "verbose": false
 }

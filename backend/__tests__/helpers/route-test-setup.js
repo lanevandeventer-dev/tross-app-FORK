@@ -28,7 +28,8 @@ function createRouteTestApp(router, path = "/api/users") {
  * @param {Object} mocks.getClientIp - request-helpers getClientIp mock
  * @param {Object} mocks.getUserAgent - request-helpers getUserAgent mock
  * @param {Object} mocks.authenticateToken - auth middleware mock
- * @param {Object} mocks.requireAdmin - auth middleware mock
+ * @param {Object} mocks.requirePermission - auth middleware factory mock
+ * @param {Object} mocks.requireMinimumRole - auth middleware factory mock
  * @param {Object} mocks.validateIdParam - validation middleware mock
  * @param {Object} mocks.validateUserCreate - validation middleware mock (users)
  * @param {Object} mocks.validateProfileUpdate - validation middleware mock (users)
@@ -44,7 +45,8 @@ function setupRouteMocks(mocks, options = {}) {
     getClientIp,
     getUserAgent,
     authenticateToken,
-    requireAdmin,
+    requirePermission,
+    requireMinimumRole,
     validateIdParam,
     validateUserCreate,
     validateProfileUpdate,
@@ -57,7 +59,7 @@ function setupRouteMocks(mocks, options = {}) {
   const dbUser = options.dbUser || {
     id: 1,
     email: "admin@example.com",
-    role_name: "admin",
+    role: "admin",
   };
 
   // Clear all mocks first
@@ -80,16 +82,28 @@ function setupRouteMocks(mocks, options = {}) {
     });
   }
 
-  if (requireAdmin) {
-    requireAdmin.mockImplementation((req, res, next) => {
+  // New permission-based middleware (factory functions)
+  if (requirePermission) {
+    requirePermission.mockImplementation(() => (req, res, next) => {
+      next();
+    });
+  }
+
+  if (requireMinimumRole) {
+    requireMinimumRole.mockImplementation(() => (req, res, next) => {
       next();
     });
   }
 
   // Setup validation middleware mocks
   if (validateIdParam) {
-    validateIdParam.mockImplementation((req, res, next) => {
-      req.validatedId = parseInt(req.params.id);
+    // validateIdParam() is now a factory function that returns middleware
+    validateIdParam.mockImplementation(() => (req, res, next) => {
+      const id = parseInt(req.params.id);
+      // Set both for backward compatibility
+      req.validatedId = id;
+      if (!req.validated) req.validated = {};
+      req.validated.id = id;
       next();
     });
   }
