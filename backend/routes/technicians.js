@@ -353,7 +353,7 @@ router.patch(
       // Authorization: Technicians can update own profile, manager+ can update any profile
       const isSelfUpdate = req.dbUser && req.dbUser.id && technician.user_id === req.dbUser.id;
       const isManagerPlus = req.dbUser && hasMinimumRole(req.dbUser.role, 'manager');
-      
+
       if (!isSelfUpdate && !isManagerPlus) {
         return res.status(HTTP_STATUS.FORBIDDEN).json({
           error: 'Forbidden',

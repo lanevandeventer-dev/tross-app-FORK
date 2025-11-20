@@ -6,20 +6,127 @@ Daily development workflow and best practices.
 
 ## Development Workflow
 
-### Starting Your Day
+### For Collaborators (Fork-Based Workflow)
+
+**Initial Setup (Once):**
+1. **Fork the repo:** Click "Fork" on `losamgmt/tross-app`
+2. **Clone your fork:**
+   ```bash
+   git clone https://github.com/YOUR-USERNAME/tross-app.git
+   cd tross-app
+   ```
+3. **Add upstream remote:**
+   ```bash
+   git remote add upstream https://github.com/losamgmt/tross-app.git
+   git remote -v  # Verify: origin (your fork), upstream (main repo)
+   ```
+
+**Starting New Work:**
+1. **Sync with upstream:**
+   ```bash
+   git checkout main
+   git fetch upstream
+   git merge upstream/main
+   git push origin main  # Update your fork
+   ```
+2. **Create feature branch:**
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+3. **Install dependencies:**
+   ```bash
+   npm install
+   cd backend && npm install
+   cd ../frontend && flutter pub get
+   ```
+
+**Making Changes:**
+1. **Write tests first** (TDD approach)
+2. **Implement feature** (smallest possible change)
+3. **Run all tests locally** (required before PR):
+   ```bash
+   npm test  # Must pass ✅
+   ```
+4. **Commit changes:**
+   ```bash
+   git add .
+   git commit -m "feat: add your feature"
+   ```
+5. **Push to your fork:**
+   ```bash
+   git push origin feature/your-feature-name
+   ```
+
+**Submitting PR:**
+1. Go to **your fork** on GitHub
+2. Click "Compare & pull request"
+3. Set base: `losamgmt/tross-app:main`
+4. Set compare: `YOUR-USERNAME/tross-app:feature/your-feature-name`
+5. Fill out PR template (What, Why, Testing)
+6. Submit PR
+
+**After Submitting:**
+- ✅ CI checks run automatically (backend tests, lint, build)
+- ✅ Vercel deploys preview URL (test your changes visually)
+- ⏳ Maintainer reviews code + runs E2E tests locally
+- ⏳ Maintainer approves and merges
+
+**Post-Merge:**
+```bash
+# Sync your fork with upstream
+git checkout main
+git fetch upstream
+git merge upstream/main
+git push origin main
+```
+
+**Alternative: GitHub Codespaces**
+
+Don't want to install Node/Flutter/PostgreSQL locally?
+
+**Use Codespaces (cloud dev environment):**
+1. Go to your fork
+2. Click "Code" → "Codespaces" → "Create codespace on main"
+3. Wait 2 minutes for setup
+4. Start coding in browser!
+
+See [CODESPACES.md](CODESPACES.md) for full guide.
+
+---
+
+### For Maintainers (Branch-Based Workflow)
+
+**Starting Your Day:**
 1. Pull latest changes: `git pull origin main`
 2. Update dependencies: `npm install && cd frontend && flutter pub get`
 3. Run migrations: `cd backend && npm run migrate`
 4. Start services: `npm run dev` (root) or `./scripts/start-dev.bat`
 5. Verify tests pass: `npm test` (backend) + `flutter test` (frontend)
 
-### Feature Development
+**Feature Development:**
 1. **Create branch:** `git checkout -b feature/your-feature-name`
 2. **Write tests first** (TDD approach)
 3. **Implement feature** (smallest possible change)
 4. **Run tests:** Verify all pass
 5. **Commit:** Clear, atomic commits
 6. **Push & PR:** Open pull request for review
+
+**Reviewing Fork PRs:**
+1. **Check CI:** Verify all checks pass (test, lint, build)
+2. **Test preview:** Click Vercel preview URL
+3. **Checkout PR locally:**
+   ```bash
+   git fetch origin pull/PR_NUMBER/head:pr-PR_NUMBER
+   git checkout pr-PR_NUMBER
+   npm install && cd backend && npm install && cd ../frontend && flutter pub get
+   ```
+4. **Run E2E tests:**
+   ```bash
+   npm run test:all  # Must pass all 3416+ tests ✅
+   ```
+5. **Review code:** Check architecture, security, tests
+6. **Approve:** GitHub PR review → "Approve"
+7. **Merge:** Squash and merge (clean history)
 
 ---
 

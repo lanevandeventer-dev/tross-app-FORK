@@ -47,6 +47,28 @@ Production deployment, Docker, CI/CD, SSL, monitoring.
 
 ---
 
+## Collaboration & Deployment Infrastructure
+
+### 🔄 [CI/CD Guide](CI_CD_GUIDE.md)
+Complete pipeline documentation. Fork workflow, E2E testing strategy, deployment automation.
+
+### 🚂 [Railway Deployment](RAILWAY_DEPLOYMENT.md)
+Backend hosting guide. $10-15/month, PostgreSQL included, auto-deploy on push.
+
+### ▲ [Vercel Deployment](VERCEL_DEPLOYMENT.md)
+Frontend hosting guide. Free tier, PR preview URLs, auto-deploy on merge.
+
+### ☁️ [GitHub Codespaces](CODESPACES.md)
+Cloud development environment. Zero local setup, perfect for non-technical collaborators.
+
+### 🔒 [Branch Protection Setup](../.github/BRANCH_PROTECTION_SETUP.md)
+GitHub UI configuration guide. Require PR approval, CI checks, maintainer-only merge.
+
+### 🤝 [Contributors Guide](../CONTRIBUTORS.md)
+How to contribute. Fork workflow, testing requirements, team recognition.
+
+---
+
 ## Reference Documentation
 
 ### Database

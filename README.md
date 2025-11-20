@@ -91,12 +91,20 @@ npm run dev:frontend   # Frontend on :8080
 ### Core Documentation
 - **[Quick Start](docs/QUICK_START.md)** - Get up and running in 5 minutes
 - **[Architecture](docs/ARCHITECTURE.md)** - Core patterns, decisions, and locked patterns
-- **[Development](docs/DEVELOPMENT.md)** - Daily workflow and code organization
+- **[Development](docs/DEVELOPMENT.md)** - Daily workflow and code organization (includes fork workflow)
 - **[Testing](docs/TESTING.md)** - Test philosophy and patterns (3416+ tests: 1675 backend, 1553 frontend, 188 E2E)
 - **[Security](docs/SECURITY.md)** - Defense-in-depth architecture
 - **[Authentication](docs/AUTH.md)** - Dual auth (dev + Auth0), RBAC
 - **[API](docs/API.md)** - RESTful patterns and conventions
 - **[Deployment](docs/DEPLOYMENT.md)** - Production deployment and CI/CD
+
+### Collaboration & Deployment
+- **[CI/CD Guide](docs/CI_CD_GUIDE.md)** - Complete pipeline, fork workflow, deployment automation
+- **[Railway Deployment](docs/RAILWAY_DEPLOYMENT.md)** - Backend hosting ($10-15/month, PostgreSQL included)
+- **[Vercel Deployment](docs/VERCEL_DEPLOYMENT.md)** - Frontend hosting (free tier, PR previews)
+- **[GitHub Codespaces](docs/CODESPACES.md)** - Cloud dev environment for non-technical collaborators
+- **[Branch Protection Setup](.github/BRANCH_PROTECTION_SETUP.md)** - GitHub UI configuration guide
+- **[Contributors Guide](CONTRIBUTORS.md)** - How to contribute, fork workflow, testing requirements
 
 ### Reference Documentation
 - **[Database Architecture](docs/architecture/DATABASE_ARCHITECTURE.md)** - Schema design and migrations
